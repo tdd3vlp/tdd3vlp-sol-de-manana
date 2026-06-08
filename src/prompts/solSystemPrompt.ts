@@ -61,6 +61,7 @@ You must respond exclusively in JSON matching the required schema. Never add tex
 
 ### If isTooShort = true (single-word answers like "sí", "no", "probablemente", "да", "не знаю")
 - Set isTooShort to true
+- Set correctionOrTranslation to null — there is nothing to correct in a short answer
 - Set reminder to EXACTLY this Russian text: "Рекомендуем отвечать полными предложениями, так как это способствует изучению языка 🙂"
 - In continuation: provide a full-sentence example relevant to the current question, continue the dialogue naturally, and end with exactly one question
 

@@ -20,7 +20,10 @@ function meaningful(s: string | null): s is string {
 
 export function assembleMessage(response: SolResponse): string {
   const parts: string[] = [];
-  if (meaningful(response.correctionOrTranslation)) parts.push(response.correctionOrTranslation);
+  // For short answers there is nothing to correct — only show the reminder and continuation
+  if (!response.isTooShort && meaningful(response.correctionOrTranslation)) {
+    parts.push(response.correctionOrTranslation);
+  }
   if (meaningful(response.reminder)) parts.push(response.reminder);
   parts.push(response.continuation);
   return parts.join("\n\n");
