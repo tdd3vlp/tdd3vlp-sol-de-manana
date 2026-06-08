@@ -1,0 +1,235 @@
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { makeSolResponse, makeChat } from "../src/testing/fixtures.js";
+import { assembleMessage, formatForTelegram } from "../src/bot/handlers.js";
+
+vi.mock("../src/config/env.js", () => ({
+  config: {
+    telegramBotToken: "test-token",
+    openaiApiKey: "test-key",
+    openaiModel: "gpt-4o",
+    databaseUrl: "postgresql://test",
+    nodeEnv: "test",
+  },
+}));
+
+vi.mock("../src/db/chatHistory.js", () => ({
+  getOrCreateChat: vi.fn(),
+  saveMessage: vi.fn(),
+  getRecentMessages: vi.fn(),
+  updateChatTheme: vi.fn(),
+  resetChat: vi.fn(),
+}));
+
+vi.mock("../src/llm/solService.js", () => ({
+  callSol: vi.fn(),
+  SolServiceError: class SolServiceError extends Error {
+    constructor(msg: string) {
+      super(msg);
+      this.name = "SolServiceError";
+    }
+  },
+}));
+
+vi.mock("../src/conversation/themes.js", () => ({
+  pickRandomTheme: vi.fn().mockReturnValue("supermarket"),
+  shouldChangeTheme: vi.fn().mockReturnValue(false),
+}));
+
+import type { Context } from "grammy";
+import {
+  getOrCreateChat,
+  saveMessage,
+  getRecentMessages,
+  updateChatTheme,
+  resetChat,
+} from "../src/db/chatHistory.js";
+import { callSol, SolServiceError } from "../src/llm/solService.js";
+import { shouldChangeTheme } from "../src/conversation/themes.js";
+import { handleStart, handleMessage } from "../src/bot/handlers.js";
+
+function makeCtx(opts: { chatId?: number; text?: string } = {}): Context {
+  return {
+    chat: { id: opts.chatId ?? 12345 },
+    message: { text: opts.text ?? "Me gusta España." },
+    reply: vi.fn().mockResolvedValue({}),
+  } as unknown as Context;
+}
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  vi.mocked(saveMessage).mockResolvedValue({} as ReturnType<typeof saveMessage> extends Promise<infer T> ? T : never);
+  vi.mocked(getRecentMessages).mockResolvedValue([]);
+});
+
+// ── assembleMessage ──────────────────────────────────────────────────────────
+
+describe("assembleMessage", () => {
+  it("returns only continuation when nothing else is set", () => {
+    const r = makeSolResponse({ correctionOrTranslation: null, reminder: null, nextQuestion: null });
+    expect(assembleMessage(r)).toBe(r.continuation);
+  });
+
+  it("prepends correction before continuation", () => {
+    const r = makeSolResponse({
+      correctionOrTranslation: "Quiero **ir** al mercado.",
+      continuation: "Buena idea.",
+      nextQuestion: null,
+    });
+    expect(assembleMessage(r)).toBe("Quiero **ir** al mercado.\n\nBuena idea.");
+  });
+
+  it("appends nextQuestion after continuation", () => {
+    const r = makeSolResponse({
+      correctionOrTranslation: null,
+      continuation: "Interesante.",
+      nextQuestion: "¿Y tú?",
+    });
+    expect(assembleMessage(r)).toBe("Interesante.\n\n¿Y tú?");
+  });
+
+  it("orders parts: correction → reminder → continuation → question", () => {
+    const r = makeSolResponse({
+      correctionOrTranslation: "Quiero **ir** al mercado.",
+      reminder: "Рекомендуем отвечать полными предложениями, так как это способствует изучению языка 🙂",
+      continuation: "Por ejemplo: Sí, quiero ir al mercado.",
+      nextQuestion: "¿Qué quieres comprar?",
+    });
+    const parts = assembleMessage(r).split("\n\n");
+    expect(parts[0]).toContain("mercado.");
+    expect(parts[1]).toContain("Рекомендуем");
+    expect(parts[2]).toContain("Por ejemplo");
+    expect(parts[3]).toContain("¿Qué quieres");
+  });
+});
+
+// ── formatForTelegram ────────────────────────────────────────────────────────
+
+describe("formatForTelegram", () => {
+  it("converts **bold** to <b>bold</b>", () => {
+    expect(formatForTelegram("Quiero **ir** al mercado.")).toBe(
+      "Quiero <b>ir</b> al mercado."
+    );
+  });
+
+  it("escapes HTML entities", () => {
+    expect(formatForTelegram("a & b < c > d")).toBe("a &amp; b &lt; c &gt; d");
+  });
+
+  it("passes plain text through unchanged", () => {
+    expect(formatForTelegram("Hola, ¿cómo estás?")).toBe("Hola, ¿cómo estás?");
+  });
+
+  it("handles multiple bold spans", () => {
+    expect(formatForTelegram("**ir** y **vivir**")).toBe("<b>ir</b> y <b>vivir</b>");
+  });
+});
+
+// ── handleStart ──────────────────────────────────────────────────────────────
+
+describe("handleStart", () => {
+  it("resets chat, calls LLM, and replies", async () => {
+    const chat = makeChat({ id: "chat-1", telegramChatId: "12345" });
+    vi.mocked(resetChat).mockResolvedValue(chat);
+    vi.mocked(callSol).mockResolvedValue(
+      makeSolResponse({ continuation: "¡Hola!", nextQuestion: "¿De dónde eres?" })
+    );
+
+    const ctx = makeCtx();
+    await handleStart(ctx);
+
+    expect(resetChat).toHaveBeenCalledWith("12345", "supermarket");
+    expect(callSol).toHaveBeenCalledOnce();
+    expect(ctx.reply).toHaveBeenCalledOnce();
+  });
+
+  it("sends fallback message when LLM fails", async () => {
+    vi.mocked(resetChat).mockResolvedValue(makeChat());
+    vi.mocked(callSol).mockRejectedValue(new SolServiceError("fail"));
+
+    const ctx = makeCtx();
+    await handleStart(ctx);
+
+    expect(ctx.reply).toHaveBeenCalledWith(
+      expect.stringContaining("Sol de Mañana")
+    );
+  });
+
+  it("does nothing when chat context is missing", async () => {
+    const ctx = { chat: null, message: null, reply: vi.fn() } as unknown as Context;
+    await handleStart(ctx);
+    expect(ctx.reply).not.toHaveBeenCalled();
+  });
+});
+
+// ── handleMessage ────────────────────────────────────────────────────────────
+
+describe("handleMessage", () => {
+  it("saves user message, calls LLM, saves assistant message, and replies", async () => {
+    const chat = makeChat();
+    vi.mocked(getOrCreateChat).mockResolvedValue(chat);
+    vi.mocked(updateChatTheme).mockResolvedValue({ ...chat, themeReplyCount: 1 });
+    vi.mocked(callSol).mockResolvedValue(
+      makeSolResponse({ continuation: "Interesante.", nextQuestion: "¿Y tú?" })
+    );
+
+    const ctx = makeCtx({ text: "Me gusta España." });
+    await handleMessage(ctx);
+
+    expect(saveMessage).toHaveBeenCalledWith(chat.id, "user", "Me gusta España.");
+    expect(callSol).toHaveBeenCalledOnce();
+    expect(saveMessage).toHaveBeenCalledWith(
+      expect.any(String),
+      "assistant",
+      expect.any(String),
+      expect.any(String)
+    );
+    expect(ctx.reply).toHaveBeenCalledOnce();
+  });
+
+  it("increments themeReplyCount when theme does not change", async () => {
+    vi.mocked(shouldChangeTheme).mockReturnValue(false);
+    const chat = makeChat({ themeReplyCount: 2, currentTheme: "supermarket" });
+    vi.mocked(getOrCreateChat).mockResolvedValue(chat);
+    vi.mocked(updateChatTheme).mockResolvedValue({ ...chat, themeReplyCount: 3 });
+    vi.mocked(callSol).mockResolvedValue(makeSolResponse());
+
+    await handleMessage(makeCtx());
+
+    expect(updateChatTheme).toHaveBeenCalledWith(chat.id, "supermarket", 3);
+  });
+
+  it("resets count to 0 and picks new theme when shouldChangeTheme is true", async () => {
+    vi.mocked(shouldChangeTheme).mockReturnValue(true);
+    const chat = makeChat({ themeReplyCount: 8, currentTheme: "supermarket" });
+    vi.mocked(getOrCreateChat).mockResolvedValue(chat);
+    vi.mocked(updateChatTheme).mockResolvedValue({ ...chat, currentTheme: "supermarket", themeReplyCount: 0 });
+    vi.mocked(callSol).mockResolvedValue(makeSolResponse());
+
+    await handleMessage(makeCtx());
+
+    // Count resets to 0; theme changes to whatever pickRandomTheme returns ("supermarket" in mock)
+    expect(updateChatTheme).toHaveBeenCalledWith(chat.id, "supermarket", 0);
+  });
+
+  it("sends LLM fallback message on SolServiceError", async () => {
+    vi.mocked(getOrCreateChat).mockResolvedValue(makeChat());
+    vi.mocked(callSol).mockRejectedValue(new SolServiceError("fail"));
+
+    const ctx = makeCtx();
+    await handleMessage(ctx);
+
+    expect(ctx.reply).toHaveBeenCalledWith(
+      expect.stringContaining("inténtalo")
+    );
+  });
+
+  it("does nothing when message text is missing", async () => {
+    const ctx = {
+      chat: { id: 1 },
+      message: { text: undefined },
+      reply: vi.fn(),
+    } as unknown as Context;
+    await handleMessage(ctx);
+    expect(ctx.reply).not.toHaveBeenCalled();
+  });
+});
