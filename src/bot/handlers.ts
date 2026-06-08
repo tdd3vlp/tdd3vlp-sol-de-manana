@@ -14,10 +14,14 @@ import type { SolResponse } from "../llm/schemas.js";
 
 const translateKeyboard = new InlineKeyboard().text("🇷🇺 Перевести", "translate");
 
+function meaningful(s: string | null): s is string {
+  return !!s && s.trim().length > 1;
+}
+
 export function assembleMessage(response: SolResponse): string {
   const parts: string[] = [];
-  if (response.correctionOrTranslation) parts.push(response.correctionOrTranslation);
-  if (response.reminder) parts.push(response.reminder);
+  if (meaningful(response.correctionOrTranslation)) parts.push(response.correctionOrTranslation);
+  if (meaningful(response.reminder)) parts.push(response.reminder);
   parts.push(response.continuation);
   return parts.join("\n\n");
 }

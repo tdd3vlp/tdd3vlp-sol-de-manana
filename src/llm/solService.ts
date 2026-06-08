@@ -51,19 +51,26 @@ export async function callSolStart(chat: Chat): Promise<SolResponse> {
     { role: "user", content: "hola" },
   ];
 
+  const sanitize = (r: SolResponse): SolResponse => ({
+    ...r,
+    correctionOrTranslation: null,
+    reminder: null,
+    isTooShort: false,
+  });
+
   try {
-    return await attemptParse(messages);
+    return sanitize(await attemptParse(messages));
   } catch (firstError) {
     console.warn("Start LLM call failed, retrying:", firstError);
     try {
-      return await attemptParse([
+      return sanitize(await attemptParse([
         ...messages,
         {
           role: "user",
           content:
             "Your previous response was invalid. Please respond with valid JSON matching the required schema.",
         },
-      ]);
+      ]));
     } catch (retryError) {
       console.error("Start LLM service failed after retry:", retryError);
       throw new SolServiceError("Failed to get a valid start response from the language model");
