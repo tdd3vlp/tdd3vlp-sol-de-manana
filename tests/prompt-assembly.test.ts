@@ -35,7 +35,6 @@ describe("buildSystemPrompt", () => {
     expect(prompt).toContain("isTooShort");
     expect(prompt).toContain("correctionOrTranslation");
     expect(prompt).toContain("continuation");
-    expect(prompt).toContain("nextQuestion");
     expect(prompt).toContain("shouldChangeTheme");
   });
 

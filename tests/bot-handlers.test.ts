@@ -66,40 +66,30 @@ beforeEach(() => {
 
 describe("assembleMessage", () => {
   it("returns only continuation when nothing else is set", () => {
-    const r = makeSolResponse({ correctionOrTranslation: null, reminder: null, nextQuestion: null });
+    const r = makeSolResponse({ correctionOrTranslation: null, reminder: null });
     expect(assembleMessage(r)).toBe(r.continuation);
   });
 
   it("prepends correction before continuation", () => {
     const r = makeSolResponse({
       correctionOrTranslation: "Quiero **ir** al mercado.",
-      continuation: "Buena idea.",
-      nextQuestion: null,
+      continuation: "Buena idea. ¿Qué quieres comprar?",
     });
-    expect(assembleMessage(r)).toBe("Quiero **ir** al mercado.\n\nBuena idea.");
+    expect(assembleMessage(r)).toBe(
+      "Quiero **ir** al mercado.\n\nBuena idea. ¿Qué quieres comprar?"
+    );
   });
 
-  it("appends nextQuestion after continuation", () => {
-    const r = makeSolResponse({
-      correctionOrTranslation: null,
-      continuation: "Interesante.",
-      nextQuestion: "¿Y tú?",
-    });
-    expect(assembleMessage(r)).toBe("Interesante.\n\n¿Y tú?");
-  });
-
-  it("orders parts: correction → reminder → continuation → question", () => {
+  it("orders parts: correction → reminder → continuation", () => {
     const r = makeSolResponse({
       correctionOrTranslation: "Quiero **ir** al mercado.",
       reminder: "Рекомендуем отвечать полными предложениями, так как это способствует изучению языка 🙂",
-      continuation: "Por ejemplo: Sí, quiero ir al mercado.",
-      nextQuestion: "¿Qué quieres comprar?",
+      continuation: "Por ejemplo: Sí, quiero ir al mercado. ¿Qué quieres comprar?",
     });
     const parts = assembleMessage(r).split("\n\n");
     expect(parts[0]).toContain("mercado.");
     expect(parts[1]).toContain("Рекомендуем");
     expect(parts[2]).toContain("Por ejemplo");
-    expect(parts[3]).toContain("¿Qué quieres");
   });
 });
 
@@ -132,7 +122,7 @@ describe("handleStart", () => {
     const chat = makeChat({ id: "chat-1", telegramChatId: "12345" });
     vi.mocked(resetChat).mockResolvedValue(chat);
     vi.mocked(callSolStart).mockResolvedValue(
-      makeSolResponse({ continuation: "¡Hola!", nextQuestion: "¿De dónde eres?" })
+      makeSolResponse({ continuation: "¡Hola! ¿De dónde eres?" })
     );
 
     const ctx = makeCtx();
@@ -170,7 +160,7 @@ describe("handleMessage", () => {
     vi.mocked(getOrCreateChat).mockResolvedValue(chat);
     vi.mocked(updateChatTheme).mockResolvedValue({ ...chat, themeReplyCount: 1 });
     vi.mocked(callSol).mockResolvedValue(
-      makeSolResponse({ continuation: "Interesante.", nextQuestion: "¿Y tú?" })
+      makeSolResponse({ continuation: "Interesante. ¿Y tú?" })
     );
 
     const ctx = makeCtx({ text: "Me gusta España." });

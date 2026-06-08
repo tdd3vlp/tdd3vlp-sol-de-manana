@@ -8,7 +8,6 @@ export function makeSolResponse(overrides: Partial<SolResponse> = {}): SolRespon
     correctionOrTranslation: null,
     reminder: null,
     continuation: "Buenas. ¿En qué puedo ayudarte hoy?",
-    nextQuestion: "¿Qué tal te va?",
     theme: "moving to Spain",
     shouldChangeTheme: false,
     ...overrides,

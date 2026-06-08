@@ -1,3 +1,4 @@
+import { InlineKeyboard } from "grammy";
 import type { Context } from "grammy";
 import {
   getOrCreateChat,
@@ -6,17 +7,18 @@ import {
   updateChatTheme,
   resetChat,
 } from "../db/chatHistory.js";
-import { callSol, callSolStart, SolServiceError } from "../llm/solService.js";
+import { callSol, callSolStart, translateToRussian, SolServiceError } from "../llm/solService.js";
 import { buildLLMContext } from "../conversation/context.js";
 import { pickRandomTheme, shouldChangeTheme } from "../conversation/themes.js";
 import type { SolResponse } from "../llm/schemas.js";
+
+const translateKeyboard = new InlineKeyboard().text("🇷🇺 Перевести", "translate");
 
 export function assembleMessage(response: SolResponse): string {
   const parts: string[] = [];
   if (response.correctionOrTranslation) parts.push(response.correctionOrTranslation);
   if (response.reminder) parts.push(response.reminder);
   parts.push(response.continuation);
-  if (response.nextQuestion) parts.push(response.nextQuestion);
   return parts.join("\n\n");
 }
 
@@ -39,7 +41,10 @@ export async function handleStart(ctx: Context): Promise<void> {
     const response = await callSolStart(chat);
     const rawText = assembleMessage(response);
     await saveMessage(chat.id, "assistant", rawText, JSON.stringify(response));
-    await ctx.reply(formatForTelegram(rawText), { parse_mode: "HTML" });
+    await ctx.reply(formatForTelegram(rawText), {
+      parse_mode: "HTML",
+      reply_markup: translateKeyboard,
+    });
   } catch (error) {
     console.error("handleStart error:", error);
     await ctx.reply(
@@ -78,7 +83,10 @@ export async function handleMessage(ctx: Context): Promise<void> {
 
     const rawText = assembleMessage(response);
     await saveMessage(chat.id, "assistant", rawText, JSON.stringify(response));
-    await ctx.reply(formatForTelegram(rawText), { parse_mode: "HTML" });
+    await ctx.reply(formatForTelegram(rawText), {
+      parse_mode: "HTML",
+      reply_markup: translateKeyboard,
+    });
   } catch (error) {
     if (error instanceof SolServiceError) {
       console.error("LLM service error in handleMessage:", error);
@@ -92,5 +100,25 @@ export async function handleMessage(ctx: Context): Promise<void> {
         "Lo siento, ocurrió un error inesperado. / Произошла неожиданная ошибка."
       );
     }
+  }
+}
+
+export async function handleTranslate(ctx: Context): Promise<void> {
+  const originalText = ctx.callbackQuery?.message?.text;
+  if (!originalText) {
+    await ctx.answerCallbackQuery({ text: "Текст не найден." });
+    return;
+  }
+
+  await ctx.answerCallbackQuery();
+
+  try {
+    const translation = await translateToRussian(originalText);
+    await ctx.reply(translation, {
+      reply_parameters: { message_id: ctx.callbackQuery!.message!.message_id },
+    });
+  } catch (error) {
+    console.error("Translation error:", error);
+    await ctx.reply("Не удалось перевести. Попробуй ещё раз.");
   }
 }

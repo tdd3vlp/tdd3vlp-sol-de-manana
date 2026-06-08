@@ -42,8 +42,7 @@ describe("Spanish input", () => {
       makeSolResponse({
         inputLanguage: "spanish",
         correctionOrTranslation: "Quiero **ir** al supermercado.",
-        continuation: "Buena idea.",
-        nextQuestion: "¿Qué quieres comprar?",
+        continuation: "Buena idea. ¿Qué quieres comprar?",
       })
     );
     const result = await callSol("Quiero ir la supermercado.", [], makeChat());
@@ -64,8 +63,7 @@ describe("Russian input", () => {
       makeSolResponse({
         inputLanguage: "russian",
         correctionOrTranslation: "Quiero alquilar un piso cerca del metro.",
-        continuation: "Es una buena prioridad.",
-        nextQuestion: "¿Prefieres el centro o una zona tranquila?",
+        continuation: "Es una buena prioridad. ¿Prefieres el centro o una zona tranquila?",
       })
     );
     const result = await callSol("Я хочу снять квартиру рядом с метро.", [], makeChat());
@@ -100,13 +98,11 @@ describe("Unsupported language input", () => {
         inputLanguage: "unsupported",
         correctionOrTranslation: null,
         continuation: "Por favor, escribe en español o ruso.",
-        nextQuestion: null,
       })
     );
     const result = await callSol("I want to live in Spain.", [], makeChat());
     expect(result.inputLanguage).toBe("unsupported");
     expect(result.correctionOrTranslation).toBeNull();
-    expect(result.nextQuestion).toBeNull();
   });
 });
 
@@ -119,8 +115,7 @@ describe("Too-short answer", () => {
         reminder:
           "Рекомендуем отвечать полными предложениями, так как это способствует изучению языка 🙂",
         continuation:
-          "Por ejemplo: Sí, quiero vivir en España porque me gusta el clima.",
-        nextQuestion: "¿Qué ciudad de España te interesa más?",
+          "Por ejemplo: Sí, quiero vivir en España porque me gusta el clima. ¿Qué ciudad de España te interesa más?",
       })
     );
     const result = await callSol("Sí.", [], makeChat());

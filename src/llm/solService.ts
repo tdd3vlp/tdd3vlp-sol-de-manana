@@ -27,6 +27,24 @@ async function attemptParse(
   return parsed;
 }
 
+export async function translateToRussian(text: string): Promise<string> {
+  const response = await openai.chat.completions.create({
+    model: config.openaiModel,
+    messages: [
+      {
+        role: "system",
+        content:
+          "Переведи текст с испанского на русский. Только перевод, без пояснений.",
+      },
+      { role: "user", content: text },
+    ],
+    max_tokens: 600,
+  });
+  return (
+    response.choices[0]?.message?.content?.trim() ?? "Перевод недоступен."
+  );
+}
+
 export async function callSolStart(chat: Chat): Promise<SolResponse> {
   const messages: ChatCompletionMessageParam[] = [
     { role: "system", content: buildStartSystemPrompt(chat.currentTheme) },

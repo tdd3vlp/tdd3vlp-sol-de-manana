@@ -32,12 +32,11 @@ beforeEach(() => {
 });
 
 describe("Nonsense input", () => {
-  it("returns inputLanguage=nonsense with null correction and null question", async () => {
+  it("returns inputLanguage=nonsense with null correction", async () => {
     const response = makeSolResponse({
       inputLanguage: "nonsense",
       correctionOrTranslation: null,
       continuation: "Por favor, escribe algo en español o ruso.",
-      nextQuestion: null,
     });
     vi.mocked(openai.beta.chat.completions.parse).mockResolvedValue({
       choices: [{ message: { parsed: response } }],
@@ -47,7 +46,6 @@ describe("Nonsense input", () => {
 
     expect(result.inputLanguage).toBe("nonsense");
     expect(result.correctionOrTranslation).toBeNull();
-    expect(result.nextQuestion).toBeNull();
   });
 
   it("does not add bold markers or corrections to nonsense response", async () => {
@@ -55,7 +53,6 @@ describe("Nonsense input", () => {
       inputLanguage: "nonsense",
       correctionOrTranslation: null,
       continuation: "No entiendo. Por favor, escribe en español o ruso.",
-      nextQuestion: null,
     });
     vi.mocked(openai.beta.chat.completions.parse).mockResolvedValue({
       choices: [{ message: { parsed: response } }],
@@ -66,7 +63,6 @@ describe("Nonsense input", () => {
 
     expect(text).not.toContain("**");
     expect(text).not.toContain("<b>");
-    expect(result.nextQuestion).toBeNull();
   });
 
   it("assembled message contains only the continuation warning", async () => {
@@ -76,7 +72,6 @@ describe("Nonsense input", () => {
       correctionOrTranslation: null,
       reminder: null,
       continuation: warning,
-      nextQuestion: null,
     });
     vi.mocked(openai.beta.chat.completions.parse).mockResolvedValue({
       choices: [{ message: { parsed: response } }],
