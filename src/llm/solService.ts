@@ -78,12 +78,20 @@ export async function callSolStart(chat: Chat): Promise<SolResponse> {
   }
 }
 
+const SHORT_WORD_THRESHOLD = 4;
+
 export async function callSol(
   userText: string,
   history: LLMMessage[],
   chat: Chat
 ): Promise<SolResponse> {
-  const systemPrompt = buildSystemPrompt(chat.currentTheme);
+  const wordCount = userText.trim().split(/\s+/).filter(Boolean).length;
+  const notShortHint =
+    wordCount >= SHORT_WORD_THRESHOLD
+      ? `\n\nNOTE: The user's message is ${wordCount} words long — it is NOT a short answer. You MUST set isTooShort to false.`
+      : "";
+
+  const systemPrompt = buildSystemPrompt(chat.currentTheme) + notShortHint;
 
   const baseMessages: ChatCompletionMessageParam[] = [
     { role: "system", content: systemPrompt },
