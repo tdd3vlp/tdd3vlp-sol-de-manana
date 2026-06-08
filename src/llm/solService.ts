@@ -2,7 +2,7 @@ import { zodResponseFormat } from "openai/helpers/zod";
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 import { openai } from "./openaiClient.js";
 import { SolResponseSchema, type SolResponse } from "./schemas.js";
-import { buildSystemPrompt } from "../prompts/solSystemPrompt.js";
+import { buildSystemPrompt, buildStartSystemPrompt } from "../prompts/solSystemPrompt.js";
 import { config } from "../config/env.js";
 import type { Chat } from "@prisma/client";
 import type { LLMMessage } from "../conversation/context.js";
@@ -25,6 +25,32 @@ async function attemptParse(
   const parsed = completion.choices[0]?.message?.parsed;
   if (!parsed) throw new Error("Empty parsed response from OpenAI");
   return parsed;
+}
+
+export async function callSolStart(chat: Chat): Promise<SolResponse> {
+  const messages: ChatCompletionMessageParam[] = [
+    { role: "system", content: buildStartSystemPrompt(chat.currentTheme) },
+    { role: "user", content: "hola" },
+  ];
+
+  try {
+    return await attemptParse(messages);
+  } catch (firstError) {
+    console.warn("Start LLM call failed, retrying:", firstError);
+    try {
+      return await attemptParse([
+        ...messages,
+        {
+          role: "user",
+          content:
+            "Your previous response was invalid. Please respond with valid JSON matching the required schema.",
+        },
+      ]);
+    } catch (retryError) {
+      console.error("Start LLM service failed after retry:", retryError);
+      throw new SolServiceError("Failed to get a valid start response from the language model");
+    }
+  }
 }
 
 export async function callSol(

@@ -6,7 +6,7 @@ import {
   updateChatTheme,
   resetChat,
 } from "../db/chatHistory.js";
-import { callSol, SolServiceError } from "../llm/solService.js";
+import { callSol, callSolStart, SolServiceError } from "../llm/solService.js";
 import { buildLLMContext } from "../conversation/context.js";
 import { pickRandomTheme, shouldChangeTheme } from "../conversation/themes.js";
 import type { SolResponse } from "../llm/schemas.js";
@@ -36,11 +36,7 @@ export async function handleStart(ctx: Context): Promise<void> {
   const chat = await resetChat(telegramChatId, theme);
 
   try {
-    const response = await callSol(
-      "Начни разговор. Поприветствуй меня тепло и начни первый диалог по теме.",
-      [],
-      chat
-    );
+    const response = await callSolStart(chat);
     const rawText = assembleMessage(response);
     await saveMessage(chat.id, "assistant", rawText, JSON.stringify(response));
     await ctx.reply(formatForTelegram(rawText), { parse_mode: "HTML" });

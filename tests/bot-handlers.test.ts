@@ -22,6 +22,7 @@ vi.mock("../src/db/chatHistory.js", () => ({
 
 vi.mock("../src/llm/solService.js", () => ({
   callSol: vi.fn(),
+  callSolStart: vi.fn(),
   SolServiceError: class SolServiceError extends Error {
     constructor(msg: string) {
       super(msg);
@@ -43,7 +44,7 @@ import {
   updateChatTheme,
   resetChat,
 } from "../src/db/chatHistory.js";
-import { callSol, SolServiceError } from "../src/llm/solService.js";
+import { callSol, callSolStart, SolServiceError } from "../src/llm/solService.js";
 import { shouldChangeTheme } from "../src/conversation/themes.js";
 import { handleStart, handleMessage } from "../src/bot/handlers.js";
 
@@ -127,10 +128,10 @@ describe("formatForTelegram", () => {
 // ── handleStart ──────────────────────────────────────────────────────────────
 
 describe("handleStart", () => {
-  it("resets chat, calls LLM, and replies", async () => {
+  it("resets chat, calls callSolStart, and replies", async () => {
     const chat = makeChat({ id: "chat-1", telegramChatId: "12345" });
     vi.mocked(resetChat).mockResolvedValue(chat);
-    vi.mocked(callSol).mockResolvedValue(
+    vi.mocked(callSolStart).mockResolvedValue(
       makeSolResponse({ continuation: "¡Hola!", nextQuestion: "¿De dónde eres?" })
     );
 
@@ -138,13 +139,13 @@ describe("handleStart", () => {
     await handleStart(ctx);
 
     expect(resetChat).toHaveBeenCalledWith("12345", "supermarket");
-    expect(callSol).toHaveBeenCalledOnce();
+    expect(callSolStart).toHaveBeenCalledOnce();
     expect(ctx.reply).toHaveBeenCalledOnce();
   });
 
   it("sends fallback message when LLM fails", async () => {
     vi.mocked(resetChat).mockResolvedValue(makeChat());
-    vi.mocked(callSol).mockRejectedValue(new SolServiceError("fail"));
+    vi.mocked(callSolStart).mockRejectedValue(new SolServiceError("fail"));
 
     const ctx = makeCtx();
     await handleStart(ctx);
