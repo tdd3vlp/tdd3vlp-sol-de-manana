@@ -1,3 +1,4 @@
+import { diffWords } from "diff";
 import { InlineKeyboard, Keyboard } from "grammy";
 import type { Context } from "grammy";
 import {
@@ -44,21 +45,27 @@ function sanitizeNullTokens(s: string): string {
     .trim();
 }
 
-function casefold(s: string): string {
-  return s.toLowerCase();
-}
-
-export function removeFalseBold(correction: string, userInput: string): string {
-  const userWords = new Set(
-    userInput
-      .split(/\s+/)
-      .map((w) => casefold(w.replace(/[^a-záéíóúüñA-ZÁÉÍÓÚÜÑ]/g, "")))
-      .filter(Boolean)
-  );
-  return correction.replace(/\*\*(.+?)\*\*/g, (match, word) => {
-    const bare = casefold(word.replace(/[^a-záéíóúüñA-ZÁÉÍÓÚÜÑ]/g, ""));
-    return userWords.has(bare) ? word : match;
-  });
+// Produce a bolded version of `corrected` by diffing it against `original`.
+// Only words that changed (added/replaced) get bold markers; unchanged words stay plain.
+export function diffAndBold(original: string, corrected: string): string {
+  if (!original || !corrected) return corrected || "";
+  const changes = diffWords(original, corrected);
+  let result = "";
+  for (const part of changes) {
+    if (part.removed) continue;
+    if (part.added) {
+      const text = part.value.trimEnd();
+      const trailing = part.value.slice(text.length);
+      // Keep trailing punctuation outside the bold span so it stays readable
+      const wordPart = text.replace(/[.,!?;:]+$/, "");
+      const punct = text.slice(wordPart.length);
+      if (wordPart) result += `**${wordPart}**`;
+      result += punct + trailing;
+    } else {
+      result += part.value;
+    }
+  }
+  return result.trim();
 }
 
 const UNSUPPORTED_WARNING =
@@ -74,10 +81,23 @@ export function assembleMessage(response: SolResponse, userInput?: string): stri
 
   const parts: string[] = [];
   if (meaningful(response.correctionOrTranslation)) {
-    const correction = userInput
-      ? removeFalseBold(response.correctionOrTranslation, userInput)
-      : response.correctionOrTranslation;
-    parts.push(correction);
+    let correction = sanitizeNullTokens(response.correctionOrTranslation);
+    // Strip any accidental bold the LLM might have added despite instructions
+    const plain = correction.replace(/\*\*(.+?)\*\*/g, "$1");
+    if (
+      userInput &&
+      (response.inputLanguage === "spanish" || response.inputLanguage === "mixed")
+    ) {
+      // Strip prefix to get the bare corrected sentence, diff against original input
+      const withoutPrefix = plain.replace(/^(Corrección:|En español:)\s*/i, "").trim();
+      const bolded = diffAndBold(userInput, withoutPrefix);
+      const prefix = response.inputLanguage === "spanish" ? "Corrección:" : "En español:";
+      correction = bolded ? `${prefix} ${bolded}` : "";
+    } else {
+      // Russian: full translation — show as plain text (all words are new, bolding the whole block is not useful)
+      correction = plain;
+    }
+    if (meaningful(correction)) parts.push(correction);
   }
   const cont = sanitizeNullTokens(response.continuation).replace(/\*\*(.+?)\*\*/g, "$1");
   parts.push(cont || UNSUPPORTED_WARNING);
@@ -106,7 +126,7 @@ export async function handleStart(ctx: Context): Promise<void> {
     await saveMessage(chat.id, "assistant", rawText, JSON.stringify(response));
     await ctx.reply(formatForTelegram(rawText), {
       parse_mode: "HTML",
-      reply_markup: mainKeyboard,
+      reply_markup: translateKeyboard,
     });
   } catch (error) {
     console.error("handleStart error:", error);

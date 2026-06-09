@@ -46,7 +46,7 @@ import {
 } from "../src/db/chatHistory.js";
 import { callSol, callSolStart, SolServiceError } from "../src/llm/solService.js";
 import { shouldChangeTheme } from "../src/conversation/themes.js";
-import { handleStart, handleMessage } from "../src/bot/handlers.js";
+import { handleStart, handleMessage, handleUnsupportedMedia } from "../src/bot/handlers.js";
 
 function makeCtx(opts: { chatId?: number; text?: string } = {}): Context {
   return {
@@ -70,19 +70,19 @@ describe("assembleMessage", () => {
     expect(assembleMessage(r)).toBe(r.continuation);
   });
 
-  it("prepends correction before continuation", () => {
+  it("prepends correction before continuation (no userInput → no diff, plain text shown)", () => {
     const r = makeSolResponse({
-      correctionOrTranslation: "Corrección: Quiero **ir** al mercado.",
+      correctionOrTranslation: "Corrección: Quiero ir al mercado.",
       continuation: "Buena idea. ¿Qué quieres comprar?",
     });
     expect(assembleMessage(r)).toBe(
-      "Corrección: Quiero **ir** al mercado.\n\nBuena idea. ¿Qué quieres comprar?"
+      "Corrección: Quiero ir al mercado.\n\nBuena idea. ¿Qué quieres comprar?"
     );
   });
 
   it("orders parts: correction → continuation", () => {
     const r = makeSolResponse({
-      correctionOrTranslation: "Corrección: Quiero **ir** al mercado.",
+      correctionOrTranslation: "Corrección: Quiero ir al mercado.",
       continuation: "Buena idea. Es un mercado estupendo. Tienen frutas frescas todos los días. ¿Qué quieres comprar?",
     });
     const parts = assembleMessage(r).split("\n\n");
@@ -221,5 +221,30 @@ describe("handleMessage", () => {
     } as unknown as Context;
     await handleMessage(ctx);
     expect(ctx.reply).not.toHaveBeenCalled();
+  });
+});
+
+// ── handleUnsupportedMedia ───────────────────────────────────────────────────
+
+describe("handleUnsupportedMedia", () => {
+  it("replies with bilingual text-only warning", async () => {
+    const ctx = { reply: vi.fn().mockResolvedValue({}) } as unknown as Context;
+    await handleUnsupportedMedia(ctx);
+    const text: string = vi.mocked(ctx.reply).mock.calls[0][0] as string;
+    expect(text).toMatch(/текстовые сообщения/i);
+    expect(text).toMatch(/Solo acepto mensajes de texto/i);
+  });
+
+  it("replies exactly once regardless of media type", async () => {
+    const ctx = { reply: vi.fn().mockResolvedValue({}) } as unknown as Context;
+    await handleUnsupportedMedia(ctx);
+    expect(ctx.reply).toHaveBeenCalledOnce();
+  });
+
+  it("does not call the LLM or database", async () => {
+    const ctx = { reply: vi.fn().mockResolvedValue({}) } as unknown as Context;
+    await handleUnsupportedMedia(ctx);
+    expect(callSol).not.toHaveBeenCalled();
+    expect(saveMessage).not.toHaveBeenCalled();
   });
 });

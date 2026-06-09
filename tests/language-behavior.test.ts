@@ -41,13 +41,14 @@ describe("Spanish input", () => {
     stubParse(
       makeSolResponse({
         inputLanguage: "spanish",
-        correctionOrTranslation: "Quiero **ir** al supermercado.",
+        // LLM now returns plain text; bolding is added by code in assembleMessage
+        correctionOrTranslation: "Quiero ir al supermercado.",
         continuation: "Buena idea. ¿Qué quieres comprar?",
       })
     );
     const result = await callSol("Quiero ir la supermercado.", [], makeChat());
     expect(result.inputLanguage).toBe("spanish");
-    expect(result.correctionOrTranslation).toContain("**ir**");
+    expect(result.correctionOrTranslation).toBeTruthy();
   });
 
   it("makes exactly one API call on success", async () => {
@@ -111,14 +112,14 @@ describe("Short answer — corrects accent and continues", () => {
     stubParse(
       makeSolResponse({
         inputLanguage: "spanish",
-        correctionOrTranslation: "Corrección: **Sí**.",
+        correctionOrTranslation: "Corrección: Sí.",
         continuation:
           "Entiendo. España tiene muchas ciudades bonitas. Madrid es la capital y tiene mucho que ofrecer. ¿Qué ciudad de España te interesa más?",
       })
     );
     const result = await callSol("si.", [], makeChat());
     expect(result.inputLanguage).toBe("spanish");
-    expect(result.correctionOrTranslation).toContain("**Sí**");
+    expect(result.correctionOrTranslation).toBeTruthy();
   });
 });
 
@@ -127,28 +128,28 @@ describe("Accent correction on nouns", () => {
     stubParse(
       makeSolResponse({
         inputLanguage: "spanish",
-        correctionOrTranslation: "Corrección: Me gusta el **café**.",
+        correctionOrTranslation: "Corrección: Me gusta el café.",
         continuation:
           "Hay muchos cafés bonitos en España. En Madrid y Barcelona puedes encontrar lugares con mucha historia. ¿Tienes algún café favorito ya?",
       })
     );
     const result = await callSol("Me gusta el cafe.", [], makeChat());
     expect(result.inputLanguage).toBe("spanish");
-    expect(result.correctionOrTranslation).toContain("**café**");
+    expect(result.correctionOrTranslation).toContain("café");
   });
 
   it("corrects 'ingles' to 'inglés'", async () => {
     stubParse(
       makeSolResponse({
         inputLanguage: "spanish",
-        correctionOrTranslation: "Corrección: Hablo **inglés** y español.",
+        correctionOrTranslation: "Corrección: Hablo inglés y español.",
         continuation:
           "Hablar dos idiomas es una gran ventaja. En España el inglés es muy útil en zonas turísticas. ¿Cuánto tiempo llevas estudiando español?",
       })
     );
     const result = await callSol("Hablo ingles y español.", [], makeChat());
     expect(result.inputLanguage).toBe("spanish");
-    expect(result.correctionOrTranslation).toContain("**inglés**");
+    expect(result.correctionOrTranslation).toContain("inglés");
   });
 });
 

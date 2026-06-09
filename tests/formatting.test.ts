@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { makeSolResponse } from "../src/testing/fixtures.js";
 import { shouldChangeTheme } from "../src/conversation/themes.js";
-import { removeFalseBold, assembleMessage, formatForTelegram } from "../src/bot/handlers.js";
+import { diffAndBold, assembleMessage, formatForTelegram } from "../src/bot/handlers.js";
 
 describe("shouldChangeTheme", () => {
   it("returns false for count below 4", () => {
@@ -24,51 +24,56 @@ describe("shouldChangeTheme", () => {
   });
 });
 
-describe("removeFalseBold", () => {
-  it("strips bold from a word that appears unchanged in the user input", () => {
-    expect(removeFalseBold("Me gustan las **fiestas**.", "Me gustan las fiestas.")).toBe(
-      "Me gustan las fiestas."
+describe("diffAndBold", () => {
+  it("bolds a word that gained an accent mark", () => {
+    expect(diffAndBold("Me gusta el cafe.", "Me gusta el café.")).toBe(
+      "Me gusta el **café**."
     );
   });
 
-  it("preserves bold when the corrected word differs by accent mark", () => {
-    expect(removeFalseBold("**Sí**, quiero ir.", "si, quiero ir.")).toBe(
-      "**Sí**, quiero ir."
+  it("bolds a word with a fixed accent on a verb", () => {
+    expect(diffAndBold("Esta bien.", "Está bien.")).toBe("**Está** bien.");
+  });
+
+  it("bolds a replaced misspelled word", () => {
+    const result = diffAndBold(
+      "Soy programista.",
+      "Soy programador."
     );
+    expect(result).toContain("**programador**");
   });
 
-  it("preserves bold when the corrected word is genuinely different", () => {
-    expect(removeFalseBold("Quiero **ir** al mercado.", "Quiero ir al mercado.")).toBe(
-      "Quiero ir al mercado."
+  it("bolds an added opening ¿ together with the question word", () => {
+    const result = diffAndBold("Donde vives?", "¿Dónde vives?");
+    expect(result).toContain("**¿Dónde**");
+  });
+
+  it("does not bold a word that is unchanged", () => {
+    const result = diffAndBold("Me gusta el café.", "Me gusta el café.");
+    expect(result).not.toContain("**");
+  });
+
+  it("handles multiple corrections in one sentence", () => {
+    const result = diffAndBold(
+      "Donde esta Monjuic?",
+      "¿Dónde está Montjuïc?"
     );
-    // "ir" appears in user input unchanged — should be stripped
-    expect(removeFalseBold("Quiero **comprar** fruta.", "Quiero ir al mercado.")).toBe(
-      "Quiero **comprar** fruta."
-    );
+    // All three words changed — may be individual spans or one grouped span; all must be bolded
+    expect(result).toContain("¿Dónde");
+    expect(result).toContain("está");
+    expect(result).toContain("Montjuïc");
+    expect(result).toContain("**");
+    // Ensure no original (wrong) word appears instead
+    expect(result).not.toContain("Donde ");
+    expect(result).not.toContain(" esta ");
   });
 
-  it("handles multiple bold tokens, stripping only false ones", () => {
-    const result = removeFalseBold(
-      "Quiero **comprar** **fiestas** en el mercado.",
-      "Quiero ir fiestas en el mercado."
-    );
-    expect(result).toBe("Quiero **comprar** fiestas en el mercado.");
+  it("keeps trailing punctuation outside the bold span", () => {
+    expect(diffAndBold("Hablo ingles.", "Hablo inglés.")).toBe("Hablo **inglés**.");
   });
 
-  it("is case-insensitive when comparing", () => {
-    expect(removeFalseBold("**Hola** amigo.", "hola amigo.")).toBe("Hola amigo.");
-  });
-
-  it("preserves bold when accent was added to a noun (cafe → café)", () => {
-    expect(
-      removeFalseBold("Me gusta el **café**.", "Me gusta el cafe.")
-    ).toBe("Me gusta el **café**.");
-  });
-
-  it("preserves bold when accent was added to a language name (ingles → inglés)", () => {
-    expect(
-      removeFalseBold("Hablo **inglés** y español.", "Hablo ingles y español.")
-    ).toBe("Hablo **inglés** y español.");
+  it("returns the corrected text unchanged when original is empty", () => {
+    expect(diffAndBold("", "Hola.")).toBe("Hola.");
   });
 });
 
@@ -89,7 +94,8 @@ describe("bold formatting end-to-end (assembleMessage → formatForTelegram)", (
   it("renders café correction as <b>café</b> in Telegram HTML", () => {
     const r = makeSolResponse({
       inputLanguage: "spanish",
-      correctionOrTranslation: "Corrección: Me gusta el **café**.",
+      // LLM now returns plain text — no ** markers
+      correctionOrTranslation: "Corrección: Me gusta el café.",
       continuation: "Hay muchos cafés en España. ¿Tienes uno favorito?",
     });
     const html = formatForTelegram(assembleMessage(r, "Me gusta el cafe."));
@@ -100,7 +106,7 @@ describe("bold formatting end-to-end (assembleMessage → formatForTelegram)", (
   it("renders inglés correction as <b>inglés</b> in Telegram HTML", () => {
     const r = makeSolResponse({
       inputLanguage: "spanish",
-      correctionOrTranslation: "Corrección: Hablo **inglés** y español.",
+      correctionOrTranslation: "Corrección: Hablo inglés y español.",
       continuation: "Hablar idiomas es una ventaja. ¿Cuánto tiempo llevas aprendiendo?",
     });
     const html = formatForTelegram(assembleMessage(r, "Hablo ingles y español."));
@@ -111,11 +117,46 @@ describe("bold formatting end-to-end (assembleMessage → formatForTelegram)", (
   it("renders sí correction as <b>Sí</b> in Telegram HTML", () => {
     const r = makeSolResponse({
       inputLanguage: "spanish",
-      correctionOrTranslation: "Corrección: **Sí**, me gusta España.",
+      correctionOrTranslation: "Corrección: Sí, me gusta España.",
       continuation: "Me alegra oírlo. ¿Qué ciudad te gusta más?",
     });
     const html = formatForTelegram(assembleMessage(r, "si, me gusta España."));
     expect(html).toContain("<b>Sí</b>");
+    expect(html).not.toContain("**");
+  });
+
+  it("strips any accidental bold the LLM added in correctionOrTranslation before diffing", () => {
+    const r = makeSolResponse({
+      inputLanguage: "spanish",
+      // LLM disobeyed and added bold — code should still produce correct output
+      correctionOrTranslation: "Corrección: Hablo **inglés** y español.",
+      continuation: "Hablar idiomas es una ventaja. ¿Cuánto tiempo llevas aprendiendo?",
+    });
+    const html = formatForTelegram(assembleMessage(r, "Hablo ingles y español."));
+    expect(html).toContain("<b>inglés</b>");
+    expect(html).not.toContain("**");
+  });
+});
+
+describe("bold formatting for mixed input (assembleMessage → formatForTelegram)", () => {
+  it("bolds changed/translated words in mixed input via code diff", () => {
+    const r = makeSolResponse({
+      inputLanguage: "mixed",
+      // LLM returns plain text — code does the diff
+      correctionOrTranslation:
+        "En español: Trabajo como programador. Sí, es algo que me gustaría continuar haciendo en España.",
+      continuation: "Es un campo muy demandado en España. ¿En qué ciudad te gustaría trabajar?",
+    });
+    const html = formatForTelegram(
+      assembleMessage(
+        r,
+        "Hm, trabajo als programista. Si, es algo que me gustaria continuar haciendo en Espana."
+      )
+    );
+    // Changed words must be bolded; unchanged words must not be wrapped in **
+    expect(html).toContain("programador");
+    expect(html).toContain("<b>gustaría</b>");
+    expect(html).toContain("<b>España</b>");
     expect(html).not.toContain("**");
   });
 });

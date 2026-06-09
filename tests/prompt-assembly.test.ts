@@ -34,8 +34,9 @@ describe("buildSystemPrompt", () => {
     expect(prompt).toContain("3 sentences");
   });
 
-  it("instructs to use bold markers for corrections", () => {
+  it("instructs to return plain text without bold markers", () => {
     const prompt = buildSystemPrompt("supermarket");
+    expect(prompt).toContain("PLAIN TEXT ONLY");
     expect(prompt).toContain("double asterisks");
   });
 
