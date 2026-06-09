@@ -10,5 +10,11 @@ bot.catch((err) => {
   console.error("Bot error:", err.error);
 });
 
+bot.api.setMyCommands([
+  { command: "start", description: "Начать или перезапустить сессию" },
+  { command: "tips", description: "Советы по работе с ботом" },
+  { command: "help", description: "Связаться с менеджером" },
+]);
+
 bot.start();
 console.log("Sol de Mañana is running...");

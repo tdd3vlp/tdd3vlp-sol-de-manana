@@ -1,5 +1,5 @@
 import { diffWords } from "diff";
-import { InlineKeyboard, Keyboard } from "grammy";
+import { InlineKeyboard } from "grammy";
 import type { Context } from "grammy";
 import {
   getOrCreateChat,
@@ -13,22 +13,19 @@ import { buildLLMContext } from "../conversation/context.js";
 import { pickRandomTheme, pickRandomThemes, shouldChangeTheme, THEME_LABELS } from "../conversation/themes.js";
 import type { SolResponse } from "../llm/schemas.js";
 
-const MENU_TOPIC = "Выбрать тему";
-const MENU_RECOMMENDATIONS = "Рекомендации";
+const botKeyboard = new InlineKeyboard()
+  .text("Выбрать тему", "topic_menu")
+  .text("🇷🇺 Перевести", "translate");
 
-export const mainKeyboard = new Keyboard()
-  .text(MENU_TOPIC).text(MENU_RECOMMENDATIONS)
-  .resized()
-  .persistent();
-
-const translateKeyboard = new InlineKeyboard().text("🇷🇺 Перевести", "translate");
-
-const RECOMMENDATIONS =
+const TIPS =
   `Некоторые рекомендации по работе с ботом, которые способствуют изучению языка:\n\n` +
   `— Пишите полными предложениями и давайте развернутые ответы.\n` +
   `— Старайтесь всегда писать на испанском языке, бот выделит ошибки.\n` +
   `— Можете написать ответ полностью или частично на русском языке.\n` +
   `— Меняйте тему в любой момент и изучайте лексику.`;
+
+const HELP =
+  `Если у вас возникли вопросы или предложения, напишите менеджеру.`;
 
 // Rejects null, bare "null", and LLM artifacts like ":null," or "null,"
 function meaningful(s: string | null): s is string {
@@ -88,8 +85,10 @@ export function assembleMessage(response: SolResponse, userInput?: string): stri
       userInput &&
       (response.inputLanguage === "spanish" || response.inputLanguage === "mixed")
     ) {
-      // Strip prefix to get the bare corrected sentence, diff against original input
-      const withoutPrefix = plain.replace(/^(Corrección:|En español:)\s*/i, "").trim();
+      // Find "Corrección:"/"En español:" anywhere in the string to handle LLM artifacts
+      // like ". Corrección: sentence" where junk precedes the prefix.
+      const prefixMatch = plain.match(/(?:Corrección:|En español:)\s*([\s\S]*)/i);
+      const withoutPrefix = prefixMatch ? prefixMatch[1].trim() : plain.trim();
       const bolded = diffAndBold(userInput, withoutPrefix);
       const prefix = response.inputLanguage === "spanish" ? "Corrección:" : "En español:";
       correction = bolded ? `${prefix} ${bolded}` : "";
@@ -126,15 +125,14 @@ export async function handleStart(ctx: Context): Promise<void> {
     await saveMessage(chat.id, "assistant", rawText, JSON.stringify(response));
     await ctx.reply(formatForTelegram(rawText), {
       parse_mode: "HTML",
-      reply_markup: mainKeyboard,
+      reply_markup: botKeyboard,
     });
   } catch (error) {
     console.error("handleStart error:", error);
     await ctx.reply(
       "¡Hola! Soy Sol de Mañana, tu compañero de español. " +
         "Escríbeme algo en español o ruso y empezamos. / " +
-        "Привет! Я Sol de Mañana. Напиши мне что-нибудь по-испански или по-русски!",
-      { reply_markup: mainKeyboard }
+        "Привет! Я Sol de Mañana. Напиши мне что-нибудь по-испански или по-русски!"
     );
   }
 }
@@ -151,6 +149,7 @@ function buildTopicKeyboard(): InlineKeyboard {
 }
 
 export async function handleTopicMenu(ctx: Context): Promise<void> {
+  await ctx.answerCallbackQuery();
   await ctx.reply("Выбери тему для разговора:", { reply_markup: buildTopicKeyboard() });
 }
 
@@ -176,7 +175,7 @@ export async function handleTopicCallback(ctx: Context): Promise<void> {
     await saveMessage(chat.id, "assistant", rawText, JSON.stringify(response));
     await ctx.reply(formatForTelegram(rawText), {
       parse_mode: "HTML",
-      reply_markup: mainKeyboard,
+      reply_markup: botKeyboard,
     });
   } catch (error) {
     console.error("handleTopicCallback error:", error);
@@ -184,23 +183,20 @@ export async function handleTopicCallback(ctx: Context): Promise<void> {
   }
 }
 
-export async function handleRecommendations(ctx: Context): Promise<void> {
-  await ctx.reply(RECOMMENDATIONS);
+export async function handleTips(ctx: Context): Promise<void> {
+  await ctx.reply(TIPS);
+}
+
+export async function handleHelp(ctx: Context): Promise<void> {
+  await ctx.reply(HELP, {
+    reply_markup: new InlineKeyboard().url("Написать менеджеру", "https://t.me/tdd3vlp"),
+  });
 }
 
 export async function handleMessage(ctx: Context): Promise<void> {
   const telegramChatId = ctx.chat?.id?.toString();
   const userText = ctx.message?.text;
   if (!telegramChatId || !userText) return;
-
-  if (userText === MENU_TOPIC) {
-    await handleTopicMenu(ctx);
-    return;
-  }
-  if (userText === MENU_RECOMMENDATIONS) {
-    await handleRecommendations(ctx);
-    return;
-  }
 
   let chat = await getOrCreateChat(telegramChatId, pickRandomTheme());
 
@@ -226,7 +222,7 @@ export async function handleMessage(ctx: Context): Promise<void> {
     await saveMessage(chat.id, "assistant", rawText, JSON.stringify(response));
     await ctx.reply(formatForTelegram(rawText), {
       parse_mode: "HTML",
-      reply_markup: translateKeyboard,
+      reply_markup: botKeyboard,
     });
   } catch (error) {
     if (error instanceof SolServiceError) {
