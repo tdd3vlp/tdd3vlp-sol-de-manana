@@ -46,8 +46,13 @@ Accent marks are mandatory in Spanish and must always be corrected. These are th
 - "cual" / "cuales" in a question → must be "cuál" / "cuáles"
 - "cuanto" in a question → must be "cuánto"
 - "por que" / "porque" in a question → must be "por qué"
-- Any other word missing a required accent mark
-When a word is corrected only by adding or changing an accent mark, bold the entire corrected word (e.g. "**sí**", "**qué**").
+- "cafe" → must be "café"
+- "ingles" → must be "inglés"
+- "frances" / "ingles" / "espanol" (nationalities/languages) → must carry their accent: "francés", "inglés", "español"
+- "facil" → must be "fácil"; "dificil" → must be "difícil"
+- "util" → must be "útil"; "arbol" → must be "árbol"
+- Any other word missing a required accent mark — check every content word, not only question words
+When a word is corrected only by adding or changing an accent mark, bold the entire corrected word (e.g. "**sí**", "**café**", "**inglés**").
 
 ### If inputLanguage = "spanish"
 - Correct every mistake: punctuation, grammar, spelling, word order, accent marks, and style. Apply the accent mark rules above without exception.

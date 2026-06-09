@@ -122,6 +122,36 @@ describe("Short answer — corrects accent and continues", () => {
   });
 });
 
+describe("Accent correction on nouns", () => {
+  it("corrects 'cafe' to 'café'", async () => {
+    stubParse(
+      makeSolResponse({
+        inputLanguage: "spanish",
+        correctionOrTranslation: "Corrección: Me gusta el **café**.",
+        continuation:
+          "Hay muchos cafés bonitos en España. En Madrid y Barcelona puedes encontrar lugares con mucha historia. ¿Tienes algún café favorito ya?",
+      })
+    );
+    const result = await callSol("Me gusta el cafe.", [], makeChat());
+    expect(result.inputLanguage).toBe("spanish");
+    expect(result.correctionOrTranslation).toContain("**café**");
+  });
+
+  it("corrects 'ingles' to 'inglés'", async () => {
+    stubParse(
+      makeSolResponse({
+        inputLanguage: "spanish",
+        correctionOrTranslation: "Corrección: Hablo **inglés** y español.",
+        continuation:
+          "Hablar dos idiomas es una gran ventaja. En España el inglés es muy útil en zonas turísticas. ¿Cuánto tiempo llevas estudiando español?",
+      })
+    );
+    const result = await callSol("Hablo ingles y español.", [], makeChat());
+    expect(result.inputLanguage).toBe("spanish");
+    expect(result.correctionOrTranslation).toContain("**inglés**");
+  });
+});
+
 describe("LLM failure and retry", () => {
   it("retries once on first failure and returns result on second success", async () => {
     vi.mocked(openai.beta.chat.completions.parse)
