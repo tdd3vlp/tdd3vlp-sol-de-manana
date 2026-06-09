@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { makeSolResponse } from "../src/testing/fixtures.js";
 import { shouldChangeTheme } from "../src/conversation/themes.js";
-import { removeFalseBold, assembleMessage } from "../src/bot/handlers.js";
+import { removeFalseBold, assembleMessage, formatForTelegram } from "../src/bot/handlers.js";
 
 describe("shouldChangeTheme", () => {
   it("returns false for count below 4", () => {
@@ -58,6 +58,18 @@ describe("removeFalseBold", () => {
   it("is case-insensitive when comparing", () => {
     expect(removeFalseBold("**Hola** amigo.", "hola amigo.")).toBe("Hola amigo.");
   });
+
+  it("preserves bold when accent was added to a noun (cafe → café)", () => {
+    expect(
+      removeFalseBold("Me gusta el **café**.", "Me gusta el cafe.")
+    ).toBe("Me gusta el **café**.");
+  });
+
+  it("preserves bold when accent was added to a language name (ingles → inglés)", () => {
+    expect(
+      removeFalseBold("Hablo **inglés** y español.", "Hablo ingles y español.")
+    ).toBe("Hablo **inglés** y español.");
+  });
 });
 
 describe("assembleMessage — continuation bold stripping", () => {
@@ -70,6 +82,41 @@ describe("assembleMessage — continuation bold stripping", () => {
     const out = assembleMessage(r, "Quiero ir al mercado.");
     expect(out).not.toContain("**");
     expect(out).toContain("Quiero");
+  });
+});
+
+describe("bold formatting end-to-end (assembleMessage → formatForTelegram)", () => {
+  it("renders café correction as <b>café</b> in Telegram HTML", () => {
+    const r = makeSolResponse({
+      inputLanguage: "spanish",
+      correctionOrTranslation: "Corrección: Me gusta el **café**.",
+      continuation: "Hay muchos cafés en España. ¿Tienes uno favorito?",
+    });
+    const html = formatForTelegram(assembleMessage(r, "Me gusta el cafe."));
+    expect(html).toContain("<b>café</b>");
+    expect(html).not.toContain("**");
+  });
+
+  it("renders inglés correction as <b>inglés</b> in Telegram HTML", () => {
+    const r = makeSolResponse({
+      inputLanguage: "spanish",
+      correctionOrTranslation: "Corrección: Hablo **inglés** y español.",
+      continuation: "Hablar idiomas es una ventaja. ¿Cuánto tiempo llevas aprendiendo?",
+    });
+    const html = formatForTelegram(assembleMessage(r, "Hablo ingles y español."));
+    expect(html).toContain("<b>inglés</b>");
+    expect(html).not.toContain("**");
+  });
+
+  it("renders sí correction as <b>Sí</b> in Telegram HTML", () => {
+    const r = makeSolResponse({
+      inputLanguage: "spanish",
+      correctionOrTranslation: "Corrección: **Sí**, me gusta España.",
+      continuation: "Me alegra oírlo. ¿Qué ciudad te gusta más?",
+    });
+    const html = formatForTelegram(assembleMessage(r, "si, me gusta España."));
+    expect(html).toContain("<b>Sí</b>");
+    expect(html).not.toContain("**");
   });
 });
 
