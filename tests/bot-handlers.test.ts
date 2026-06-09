@@ -139,7 +139,8 @@ describe("handleStart", () => {
     await handleStart(ctx);
 
     expect(ctx.reply).toHaveBeenCalledWith(
-      expect.stringContaining("Sol de Mañana")
+      expect.stringContaining("Sol de Mañana"),
+      expect.objectContaining({ reply_markup: expect.anything() })
     );
   });
 

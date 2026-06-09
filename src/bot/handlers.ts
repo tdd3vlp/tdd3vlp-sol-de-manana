@@ -1,4 +1,4 @@
-import { InlineKeyboard } from "grammy";
+import { InlineKeyboard, Keyboard } from "grammy";
 import type { Context } from "grammy";
 import {
   getOrCreateChat,
@@ -9,10 +9,26 @@ import {
 } from "../db/chatHistory.js";
 import { callSol, callSolStart, translateToRussian, SolServiceError } from "../llm/solService.js";
 import { buildLLMContext } from "../conversation/context.js";
-import { pickRandomTheme, shouldChangeTheme } from "../conversation/themes.js";
+import { pickRandomTheme, pickRandomThemes, shouldChangeTheme, THEME_LABELS } from "../conversation/themes.js";
 import type { SolResponse } from "../llm/schemas.js";
 
+const MENU_TOPIC = "Выбрать тему";
+const MENU_RECOMMENDATIONS = "Рекомендации";
+
+export const mainKeyboard = new Keyboard()
+  .text(MENU_TOPIC).text(MENU_RECOMMENDATIONS)
+  .resized()
+  .persistent();
+
 const translateKeyboard = new InlineKeyboard().text("🇷🇺 Перевести", "translate");
+
+const RECOMMENDATIONS =
+  `Как получать максимум от практики:\n\n` +
+  `— Пиши полными предложениями — это главное условие прогресса.\n` +
+  `— Используй испанский, даже если не уверен. Ошибки исправлю.\n` +
+  `— Не знаешь слово — опиши его по-испански.\n` +
+  `— Можно писать по-русски — переведу и продолжим на испанском.\n` +
+  `— Тему можно сменить в любой момент.`;
 
 // Rejects null, bare "null", and LLM artifacts like ":null," or "null,"
 function meaningful(s: string | null): s is string {
@@ -23,15 +39,12 @@ function meaningful(s: string | null): s is string {
 
 function sanitizeNullTokens(s: string): string {
   return s
-    .replace(/^(\s*:?null[,.:;]?\s*\n*)+/i, "")  // strip leading null artifact (including "null:")
-    .replace(/\bnull[,.:;]?\s*/gi, "")             // strip null anywhere mid-text
-    .replace(/\n{3,}/g, "\n\n")                    // collapse triple+ newlines
+    .replace(/^(\s*:?null[,.:;]?\s*\n*)+/i, "")
+    .replace(/\bnull[,.:;]?\s*/gi, "")
+    .replace(/\n{3,}/g, "\n\n")
     .trim();
 }
 
-// Strip bold markers (**word**) from any word that appears unchanged in the original input.
-// Comparison is case-insensitive but accent-sensitive: "fiestas"/"Fiestas" match,
-// but "si" and "sí" do NOT match, so accent corrections keep their bold.
 function casefold(s: string): string {
   return s.toLowerCase();
 }
@@ -70,7 +83,6 @@ export function assembleMessage(response: SolResponse, userInput?: string): stri
   const cont = sanitizeNullTokens(response.continuation).replace(/\*\*(.+?)\*\*/g, "$1");
   parts.push(cont || UNSUPPORTED_WARNING);
   const result = parts.join("\n\n");
-  // Last-resort: if "null" somehow survived sanitization, strip it
   return result.replace(/\bnull\b[,.:;]?\s*/gi, "").trim() || UNSUPPORTED_WARNING;
 }
 
@@ -95,16 +107,56 @@ export async function handleStart(ctx: Context): Promise<void> {
     await saveMessage(chat.id, "assistant", rawText, JSON.stringify(response));
     await ctx.reply(formatForTelegram(rawText), {
       parse_mode: "HTML",
-      reply_markup: translateKeyboard,
+      reply_markup: mainKeyboard,
     });
   } catch (error) {
     console.error("handleStart error:", error);
     await ctx.reply(
       "¡Hola! Soy Sol de Mañana, tu compañero de español. " +
         "Escríbeme algo en español o ruso y empezamos. / " +
-        "Привет! Я Sol de Mañana. Напиши мне что-нибудь по-испански или по-русски!"
+        "Привет! Я Sol de Mañana. Напиши мне что-нибудь по-испански или по-русски!",
+      { reply_markup: mainKeyboard }
     );
   }
+}
+
+export async function handleTopicMenu(ctx: Context): Promise<void> {
+  const themes = pickRandomThemes(8);
+  const keyboard = new InlineKeyboard();
+  themes.forEach((theme, i) => {
+    keyboard.text(THEME_LABELS[theme] ?? theme, `topic:${theme}`);
+    if (i % 2 === 1) keyboard.row();
+  });
+  await ctx.reply("Выбери тему для разговора:", { reply_markup: keyboard });
+}
+
+export async function handleTopicCallback(ctx: Context): Promise<void> {
+  await ctx.answerCallbackQuery();
+  const theme = ctx.callbackQuery?.data?.replace("topic:", "");
+  if (!theme) return;
+
+  const telegramChatId = ctx.chat?.id?.toString();
+  if (!telegramChatId) return;
+
+  let chat = await getOrCreateChat(telegramChatId, theme);
+  chat = await updateChatTheme(chat.id, theme, 0);
+
+  try {
+    const response = await callSolStart(chat);
+    const rawText = assembleMessage(response);
+    await saveMessage(chat.id, "assistant", rawText, JSON.stringify(response));
+    await ctx.reply(formatForTelegram(rawText), {
+      parse_mode: "HTML",
+      reply_markup: translateKeyboard,
+    });
+  } catch (error) {
+    console.error("handleTopicCallback error:", error);
+    await ctx.reply("Lo siento, ocurrió un error. Por favor, inténtalo de nuevo.");
+  }
+}
+
+export async function handleRecommendations(ctx: Context): Promise<void> {
+  await ctx.reply(RECOMMENDATIONS);
 }
 
 export async function handleMessage(ctx: Context): Promise<void> {
@@ -112,9 +164,17 @@ export async function handleMessage(ctx: Context): Promise<void> {
   const userText = ctx.message?.text;
   if (!telegramChatId || !userText) return;
 
+  if (userText === MENU_TOPIC) {
+    await handleTopicMenu(ctx);
+    return;
+  }
+  if (userText === MENU_RECOMMENDATIONS) {
+    await handleRecommendations(ctx);
+    return;
+  }
+
   let chat = await getOrCreateChat(telegramChatId, pickRandomTheme());
 
-  // Fetch history before saving the current message so it appears as the last user turn
   const recentMessages = await getRecentMessages(chat.id, 14);
   const llmHistory = buildLLMContext(recentMessages);
 
