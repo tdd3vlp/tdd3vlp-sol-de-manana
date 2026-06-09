@@ -1,5 +1,6 @@
 import { prisma } from "./prisma.js";
 import type { Chat, Message } from "@prisma/client";
+import { isAdminUser, getPlanLimit, isNewDay } from "../subscription/plans.js";
 
 export type { Chat, Message };
 
@@ -45,6 +46,43 @@ export async function updateChatTheme(
   return prisma.chat.update({
     where: { id: chatId },
     data: { currentTheme: theme, themeReplyCount: count },
+  });
+}
+
+export async function checkAndMaybeReset(
+  chat: Chat,
+  telegramUserId: string | undefined
+): Promise<{ allowed: boolean; chat: Chat }> {
+  if (telegramUserId && isAdminUser(telegramUserId)) {
+    return { allowed: true, chat };
+  }
+
+  let current = chat;
+  if (isNewDay(chat.dailyResetAt)) {
+    current = await prisma.chat.update({
+      where: { id: chat.id },
+      data: { dailyMessageCount: 0, dailyResetAt: new Date() },
+    });
+  }
+
+  const limit = getPlanLimit(current.plan);
+  return { allowed: current.dailyMessageCount < limit, chat: current };
+}
+
+export async function incrementDailyCount(chatId: string): Promise<void> {
+  await prisma.chat.update({
+    where: { id: chatId },
+    data: { dailyMessageCount: { increment: 1 } },
+  });
+}
+
+export async function upgradeChatPlan(
+  telegramChatId: string,
+  plan: string
+): Promise<Chat> {
+  return prisma.chat.update({
+    where: { telegramChatId },
+    data: { plan },
   });
 }
 

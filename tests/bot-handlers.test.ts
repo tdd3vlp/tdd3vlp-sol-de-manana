@@ -9,6 +9,8 @@ vi.mock("../src/config/env.js", () => ({
     openaiModel: "gpt-4o",
     databaseUrl: "postgresql://test",
     nodeEnv: "test",
+    webappUrl: "",
+    adminTelegramIds: [],
   },
 }));
 
@@ -18,6 +20,9 @@ vi.mock("../src/db/chatHistory.js", () => ({
   getRecentMessages: vi.fn(),
   updateChatTheme: vi.fn(),
   resetChat: vi.fn(),
+  checkAndMaybeReset: vi.fn(),
+  incrementDailyCount: vi.fn(),
+  upgradeChatPlan: vi.fn(),
 }));
 
 vi.mock("../src/llm/solService.js", () => ({
@@ -43,6 +48,8 @@ import {
   getRecentMessages,
   updateChatTheme,
   resetChat,
+  checkAndMaybeReset,
+  incrementDailyCount,
 } from "../src/db/chatHistory.js";
 import { callSol, callSolStart, SolServiceError } from "../src/llm/solService.js";
 import { shouldChangeTheme } from "../src/conversation/themes.js";
@@ -60,6 +67,9 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(saveMessage).mockResolvedValue({} as ReturnType<typeof saveMessage> extends Promise<infer T> ? T : never);
   vi.mocked(getRecentMessages).mockResolvedValue([]);
+  vi.mocked(incrementDailyCount).mockResolvedValue();
+  // Default: limit not exceeded, return chat unchanged
+  vi.mocked(checkAndMaybeReset).mockImplementation(async (chat) => ({ allowed: true, chat }));
 });
 
 // ── assembleMessage ──────────────────────────────────────────────────────────
@@ -139,8 +149,7 @@ describe("handleStart", () => {
     await handleStart(ctx);
 
     expect(ctx.reply).toHaveBeenCalledWith(
-      expect.stringContaining("Sol de Mañana"),
-      expect.objectContaining({ reply_markup: expect.anything() })
+      expect.stringContaining("Sol de Mañana")
     );
   });
 

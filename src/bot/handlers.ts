@@ -7,15 +7,64 @@ import {
   getRecentMessages,
   updateChatTheme,
   resetChat,
+  checkAndMaybeReset,
+  incrementDailyCount,
+  upgradeChatPlan,
 } from "../db/chatHistory.js";
 import { callSol, callSolStart, translateToRussian, SolServiceError } from "../llm/solService.js";
 import { buildLLMContext } from "../conversation/context.js";
 import { pickRandomTheme, pickRandomThemes, shouldChangeTheme, THEME_LABELS } from "../conversation/themes.js";
+import { isNonsense, isLikelyUnsupported } from "../conversation/language.js";
+import { PLAN_PRICES_STARS } from "../subscription/plans.js";
+import { config } from "../config/env.js";
 import type { SolResponse } from "../llm/schemas.js";
 
 const botKeyboard = new InlineKeyboard()
   .text("Выбрать тему", "topic_menu")
   .text("🇷🇺 Перевести", "translate");
+
+function buildSubscribeKeyboard(plan: string): InlineKeyboard {
+  const keyboard = new InlineKeyboard();
+  if (config.webappUrl) {
+    const url = new URL(config.webappUrl);
+    url.searchParams.set("plan", plan);
+    url.searchParams.set("basic_price", String(PLAN_PRICES_STARS.basic));
+    url.searchParams.set("premium_price", String(PLAN_PRICES_STARS.premium));
+    keyboard.webApp("Смотреть тарифы", url.toString());
+  } else {
+    keyboard
+      .text(`Basic — ${PLAN_PRICES_STARS.basic} Stars`, "pay:basic")
+      .row()
+      .text(`Premium — ${PLAN_PRICES_STARS.premium} Stars`, "pay:premium");
+  }
+  return keyboard;
+}
+
+async function sendPaywall(ctx: Context, plan = "free"): Promise<void> {
+  await ctx.reply(
+    "На сегодня сообщения закончились.\nОбнови подписку, чтобы продолжить.",
+    { reply_markup: buildSubscribeKeyboard(plan) }
+  );
+}
+
+async function sendSubscriptionInvoice(
+  ctx: Context,
+  plan: "basic" | "premium"
+): Promise<void> {
+  const labels: Record<string, string> = {
+    basic: "Basic — 100 сообщений в день",
+    premium: "Premium — 300 сообщений в день",
+  };
+  const stars = PLAN_PRICES_STARS[plan];
+  await ctx.api.sendInvoice(
+    ctx.chat!.id,
+    labels[plan],
+    "Доступ к Sol de Mañana",
+    `plan:${plan}`,
+    "XTR",
+    [{ label: labels[plan], amount: stars }]
+  );
+}
 
 const TIPS =
   `Некоторые рекомендации по работе с ботом, которые способствуют изучению языка:\n\n` +
@@ -164,13 +213,22 @@ export async function handleTopicCallback(ctx: Context): Promise<void> {
   if (!theme) return;
 
   const telegramChatId = ctx.chat?.id?.toString();
+  const telegramUserId = ctx.from?.id?.toString();
   if (!telegramChatId) return;
 
   let chat = await getOrCreateChat(telegramChatId, theme);
   chat = await updateChatTheme(chat.id, theme, 0);
 
+  const { allowed, chat: freshChat } = await checkAndMaybeReset(chat, telegramUserId);
+  chat = freshChat;
+  if (!allowed) {
+    await sendPaywall(ctx, chat.plan);
+    return;
+  }
+
   try {
     const response = await callSolStart(chat);
+    await incrementDailyCount(chat.id);
     const rawText = assembleMessage(response);
     await saveMessage(chat.id, "assistant", rawText, JSON.stringify(response));
     await ctx.reply(formatForTelegram(rawText), {
@@ -195,18 +253,41 @@ export async function handleHelp(ctx: Context): Promise<void> {
 
 export async function handleMessage(ctx: Context): Promise<void> {
   const telegramChatId = ctx.chat?.id?.toString();
+  const telegramUserId = ctx.from?.id?.toString();
   const userText = ctx.message?.text;
   if (!telegramChatId || !userText) return;
 
+  // Nonsense/unsupported: warn without touching the counter
+  if (isNonsense(userText) || isLikelyUnsupported(userText)) {
+    await ctx.reply(formatForTelegram(UNSUPPORTED_WARNING), {
+      parse_mode: "HTML",
+      reply_markup: botKeyboard,
+    });
+    return;
+  }
+
   let chat = await getOrCreateChat(telegramChatId, pickRandomTheme());
+
+  const { allowed, chat: freshChat } = await checkAndMaybeReset(chat, telegramUserId);
+  chat = freshChat;
+  if (!allowed) {
+    await sendPaywall(ctx, chat.plan);
+    return;
+  }
 
   const recentMessages = await getRecentMessages(chat.id, 14);
   const llmHistory = buildLLMContext(recentMessages);
-
   await saveMessage(chat.id, "user", userText);
 
   try {
     const response = await callSol(userText, llmHistory, chat);
+
+    if (
+      response.inputLanguage !== "unsupported" &&
+      response.inputLanguage !== "nonsense"
+    ) {
+      await incrementDailyCount(chat.id);
+    }
 
     let newCount = chat.themeReplyCount + 1;
     let currentTheme = chat.currentTheme;
@@ -238,6 +319,57 @@ export async function handleMessage(ctx: Context): Promise<void> {
       );
     }
   }
+}
+
+export async function handleSubscribe(ctx: Context): Promise<void> {
+  const telegramChatId = ctx.chat?.id?.toString();
+  let plan = "free";
+  if (telegramChatId) {
+    const chat = await getOrCreateChat(telegramChatId, pickRandomTheme());
+    plan = chat.plan;
+  }
+  await ctx.reply("Подписка Sol de Mañana:", {
+    reply_markup: buildSubscribeKeyboard(plan),
+  });
+}
+
+export async function handleWebAppData(ctx: Context): Promise<void> {
+  const data = ctx.message?.web_app_data?.data;
+  if (!data?.startsWith("subscribe:")) return;
+
+  const plan = data.replace("subscribe:", "");
+  if (plan !== "basic" && plan !== "premium") return;
+
+  await sendSubscriptionInvoice(ctx, plan);
+}
+
+export async function handleDirectPayCallback(ctx: Context): Promise<void> {
+  await ctx.answerCallbackQuery();
+  const plan = ctx.callbackQuery?.data?.replace("pay:", "");
+  if (plan !== "basic" && plan !== "premium") return;
+  await sendSubscriptionInvoice(ctx, plan);
+}
+
+export async function handlePreCheckout(ctx: Context): Promise<void> {
+  await ctx.answerPreCheckoutQuery(true);
+}
+
+export async function handleSuccessfulPayment(ctx: Context): Promise<void> {
+  const payload = ctx.message?.successful_payment?.invoice_payload;
+  const telegramChatId = ctx.chat?.id?.toString();
+  if (!payload || !telegramChatId) return;
+
+  if (!payload.startsWith("plan:")) return;
+  const plan = payload.replace("plan:", "");
+  if (plan !== "basic" && plan !== "premium") return;
+
+  await upgradeChatPlan(telegramChatId, plan);
+
+  const confirmations: Record<string, string> = {
+    basic: "Подписка Basic активирована. Теперь у тебя 100 сообщений в день.",
+    premium: "Подписка Premium активирована. Теперь у тебя 300 сообщений в день.",
+  };
+  await ctx.reply(confirmations[plan] ?? "Подписка активирована.");
 }
 
 const MEDIA_WARNING =

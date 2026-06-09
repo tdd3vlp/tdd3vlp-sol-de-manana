@@ -14,4 +14,9 @@ export const config = {
   openaiModel: process.env.OPENAI_MODEL ?? "gpt-4o",
   databaseUrl: requireEnv("DATABASE_URL"),
   nodeEnv: process.env.NODE_ENV ?? "development",
+  webappUrl: process.env.WEBAPP_URL ?? "",
+  adminTelegramIds: (process.env.ADMIN_TELEGRAM_IDS ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean),
 } as const;
