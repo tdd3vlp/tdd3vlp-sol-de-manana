@@ -106,22 +106,19 @@ describe("Unsupported language input", () => {
   });
 });
 
-describe("Too-short answer", () => {
-  it("returns isTooShort=true with the Russian reminder", async () => {
+describe("Short answer — corrects accent and continues", () => {
+  it("corrects accent on 'si' and continues naturally", async () => {
     stubParse(
       makeSolResponse({
         inputLanguage: "spanish",
-        isTooShort: true,
-        reminder:
-          "Рекомендуем отвечать полными предложениями, так как это способствует изучению языка 🙂",
+        correctionOrTranslation: "Corrección: **Sí**.",
         continuation:
-          "Por ejemplo: Sí, quiero vivir en España porque me gusta el clima. ¿Qué ciudad de España te interesa más?",
+          "Entiendo. España tiene muchas ciudades bonitas. Madrid es la capital y tiene mucho que ofrecer. ¿Qué ciudad de España te interesa más?",
       })
     );
-    const result = await callSol("Sí.", [], makeChat());
-    expect(result.isTooShort).toBe(true);
-    expect(result.reminder).toContain("Рекомендуем");
-    expect(result.reminder).toContain("🙂");
+    const result = await callSol("si.", [], makeChat());
+    expect(result.inputLanguage).toBe("spanish");
+    expect(result.correctionOrTranslation).toContain("**Sí**");
   });
 });
 

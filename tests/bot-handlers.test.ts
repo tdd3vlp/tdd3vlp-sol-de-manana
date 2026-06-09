@@ -66,30 +66,28 @@ beforeEach(() => {
 
 describe("assembleMessage", () => {
   it("returns only continuation when nothing else is set", () => {
-    const r = makeSolResponse({ correctionOrTranslation: null, reminder: null });
+    const r = makeSolResponse({ correctionOrTranslation: null });
     expect(assembleMessage(r)).toBe(r.continuation);
   });
 
   it("prepends correction before continuation", () => {
     const r = makeSolResponse({
-      correctionOrTranslation: "Quiero **ir** al mercado.",
+      correctionOrTranslation: "Corrección: Quiero **ir** al mercado.",
       continuation: "Buena idea. ¿Qué quieres comprar?",
     });
     expect(assembleMessage(r)).toBe(
-      "Quiero **ir** al mercado.\n\nBuena idea. ¿Qué quieres comprar?"
+      "Corrección: Quiero **ir** al mercado.\n\nBuena idea. ¿Qué quieres comprar?"
     );
   });
 
-  it("orders parts: correction → reminder → continuation", () => {
+  it("orders parts: correction → continuation", () => {
     const r = makeSolResponse({
-      correctionOrTranslation: "Quiero **ir** al mercado.",
-      reminder: "Рекомендуем отвечать полными предложениями, так как это способствует изучению языка 🙂",
-      continuation: "Por ejemplo: Sí, quiero ir al mercado. ¿Qué quieres comprar?",
+      correctionOrTranslation: "Corrección: Quiero **ir** al mercado.",
+      continuation: "Buena idea. Es un mercado estupendo. Tienen frutas frescas todos los días. ¿Qué quieres comprar?",
     });
     const parts = assembleMessage(r).split("\n\n");
     expect(parts[0]).toContain("mercado.");
-    expect(parts[1]).toContain("Рекомендуем");
-    expect(parts[2]).toContain("Por ejemplo");
+    expect(parts[1]).toContain("Buena idea");
   });
 });
 

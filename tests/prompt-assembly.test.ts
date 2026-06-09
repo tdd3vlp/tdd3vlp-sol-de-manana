@@ -17,13 +17,6 @@ describe("buildSystemPrompt", () => {
     expect(prompt).toContain("nonsense");
   });
 
-  it("includes the short-answer reminder text verbatim", () => {
-    const prompt = buildSystemPrompt("supermarket");
-    expect(prompt).toContain(
-      "Рекомендуем отвечать полными предложениями, так как это способствует изучению языка 🙂"
-    );
-  });
-
   it("instructs to respond in JSON", () => {
     const prompt = buildSystemPrompt("supermarket");
     expect(prompt).toContain("JSON");
@@ -32,10 +25,13 @@ describe("buildSystemPrompt", () => {
   it("names all required schema fields", () => {
     const prompt = buildSystemPrompt("supermarket");
     expect(prompt).toContain("inputLanguage");
-    expect(prompt).toContain("isTooShort");
     expect(prompt).toContain("correctionOrTranslation");
     expect(prompt).toContain("continuation");
-    expect(prompt).toContain("shouldChangeTheme");
+  });
+
+  it("specifies 3 sentences + question structure for continuation", () => {
+    const prompt = buildSystemPrompt("supermarket");
+    expect(prompt).toContain("3 sentences");
   });
 
   it("instructs to use bold markers for corrections", () => {

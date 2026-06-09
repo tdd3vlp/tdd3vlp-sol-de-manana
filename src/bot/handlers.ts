@@ -14,19 +14,64 @@ import type { SolResponse } from "../llm/schemas.js";
 
 const translateKeyboard = new InlineKeyboard().text("🇷🇺 Перевести", "translate");
 
+// Rejects null, bare "null", and LLM artifacts like ":null," or "null,"
 function meaningful(s: string | null): s is string {
-  return !!s && s.trim().length > 1;
+  if (!s) return false;
+  const t = s.trim().toLowerCase();
+  return t.length > 1 && t !== "null" && !/^:?null[,.:;]?\s*$/.test(t);
 }
 
-export function assembleMessage(response: SolResponse): string {
-  const parts: string[] = [];
-  // For short answers there is nothing to correct — only show the reminder and continuation
-  if (!response.isTooShort && meaningful(response.correctionOrTranslation)) {
-    parts.push(response.correctionOrTranslation);
+function sanitizeNullTokens(s: string): string {
+  return s
+    .replace(/^(\s*:?null[,.:;]?\s*\n*)+/i, "")  // strip leading null artifact (including "null:")
+    .replace(/\bnull[,.:;]?\s*/gi, "")             // strip null anywhere mid-text
+    .replace(/\n{3,}/g, "\n\n")                    // collapse triple+ newlines
+    .trim();
+}
+
+// Strip bold markers (**word**) from any word that appears unchanged in the original input.
+// Comparison is case-insensitive but accent-sensitive: "fiestas"/"Fiestas" match,
+// but "si" and "sí" do NOT match, so accent corrections keep their bold.
+function casefold(s: string): string {
+  return s.toLowerCase();
+}
+
+export function removeFalseBold(correction: string, userInput: string): string {
+  const userWords = new Set(
+    userInput
+      .split(/\s+/)
+      .map((w) => casefold(w.replace(/[^a-záéíóúüñA-ZÁÉÍÓÚÜÑ]/g, "")))
+      .filter(Boolean)
+  );
+  return correction.replace(/\*\*(.+?)\*\*/g, (match, word) => {
+    const bare = casefold(word.replace(/[^a-záéíóúüñA-ZÁÉÍÓÚÜÑ]/g, ""));
+    return userWords.has(bare) ? word : match;
+  });
+}
+
+const UNSUPPORTED_WARNING =
+  "Por favor, escribe en español o ruso para que podamos continuar.";
+
+export function assembleMessage(response: SolResponse, userInput?: string): string {
+  if (
+    response.inputLanguage === "unsupported" ||
+    response.inputLanguage === "nonsense"
+  ) {
+    return UNSUPPORTED_WARNING;
   }
-  if (meaningful(response.reminder)) parts.push(response.reminder);
-  parts.push(response.continuation);
-  return parts.join("\n\n");
+
+  const parts: string[] = [];
+  if (meaningful(response.correctionOrTranslation)) {
+    const correction = userInput
+      ? removeFalseBold(response.correctionOrTranslation, userInput)
+      : response.correctionOrTranslation;
+    parts.push(correction);
+  }
+  const cont = sanitizeNullTokens(response.continuation).replace(/\*\*(.+?)\*\*/g, "$1");
+  parts.push(cont || UNSUPPORTED_WARNING);
+  const result = parts.join("\n\n");
+  // Last-resort: if "null" somehow survived sanitization, strip it
+  return result.replace(/\bnull\b[,.:;]?\s*/gi, "").trim() || UNSUPPORTED_WARNING;
 }
 
 export function formatForTelegram(text: string): string {
@@ -88,7 +133,7 @@ export async function handleMessage(ctx: Context): Promise<void> {
 
     chat = await updateChatTheme(chat.id, currentTheme, newCount);
 
-    const rawText = assembleMessage(response);
+    const rawText = assembleMessage(response, userText);
     await saveMessage(chat.id, "assistant", rawText, JSON.stringify(response));
     await ctx.reply(formatForTelegram(rawText), {
       parse_mode: "HTML",

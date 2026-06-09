@@ -24,7 +24,19 @@ async function attemptParse(
   });
   const parsed = completion.choices[0]?.message?.parsed;
   if (!parsed) throw new Error("Empty parsed response from OpenAI");
+  if (config.nodeEnv !== "production") console.log("[LLM raw]", JSON.stringify(parsed));
   return parsed;
+}
+
+// Detects cases where Zod parsing succeeded syntactically but the response
+// contains the word "null" as literal text in string fields — a model artifact
+// caused by the schema using nullable fields.
+function hasNullArtifacts(r: SolResponse): boolean {
+  const nullValue = /^\s*:?null[,.]?\s*$/i;
+  const nullLine = /(?:^|\n)\s*:?null[,.]?\s*(?:\n|$)/i;
+  if (typeof r.correctionOrTranslation === "string" && nullValue.test(r.correctionOrTranslation)) return true;
+  if (nullLine.test(r.continuation)) return true;
+  return false;
 }
 
 export async function translateToRussian(text: string): Promise<string> {
@@ -54,8 +66,6 @@ export async function callSolStart(chat: Chat): Promise<SolResponse> {
   const sanitize = (r: SolResponse): SolResponse => ({
     ...r,
     correctionOrTranslation: null,
-    reminder: null,
-    isTooShort: false,
   });
 
   try {
@@ -78,29 +88,21 @@ export async function callSolStart(chat: Chat): Promise<SolResponse> {
   }
 }
 
-const SHORT_WORD_THRESHOLD = 4;
-
 export async function callSol(
   userText: string,
   history: LLMMessage[],
   chat: Chat
 ): Promise<SolResponse> {
-  const wordCount = userText.trim().split(/\s+/).filter(Boolean).length;
-  const notShortHint =
-    wordCount >= SHORT_WORD_THRESHOLD
-      ? `\n\nNOTE: The user's message is ${wordCount} words long — it is NOT a short answer. You MUST set isTooShort to false.`
-      : "";
-
-  const systemPrompt = buildSystemPrompt(chat.currentTheme) + notShortHint;
-
   const baseMessages: ChatCompletionMessageParam[] = [
-    { role: "system", content: systemPrompt },
+    { role: "system", content: buildSystemPrompt(chat.currentTheme) },
     ...history.map((m) => ({ role: m.role, content: m.content })),
     { role: "user", content: userText },
   ];
 
   try {
-    return await attemptParse(baseMessages);
+    const first = await attemptParse(baseMessages);
+    if (hasNullArtifacts(first)) throw new Error("Semantic validation: null artifacts in response");
+    return first;
   } catch (firstError) {
     console.warn("First LLM call failed, retrying with repair instruction:", firstError);
     try {
@@ -112,7 +114,9 @@ export async function callSol(
             "Your previous response was invalid. Please respond again with valid JSON that strictly matches the required schema.",
         },
       ];
-      return await attemptParse(repairMessages);
+      const retry = await attemptParse(repairMessages);
+      if (hasNullArtifacts(retry)) throw new Error("Semantic validation: null artifacts in retry response");
+      return retry;
     } catch (retryError) {
       console.error("LLM service failed after retry:", retryError);
       throw new SolServiceError("Failed to get a valid response from the language model");

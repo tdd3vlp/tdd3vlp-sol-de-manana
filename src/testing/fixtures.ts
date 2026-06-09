@@ -4,12 +4,9 @@ import type { Chat, Message } from "@prisma/client";
 export function makeSolResponse(overrides: Partial<SolResponse> = {}): SolResponse {
   return {
     inputLanguage: "spanish",
-    isTooShort: false,
     correctionOrTranslation: null,
-    reminder: null,
     continuation: "Buenas. ¿En qué puedo ayudarte hoy?",
     theme: "moving to Spain",
-    shouldChangeTheme: false,
     ...overrides,
   };
 }
