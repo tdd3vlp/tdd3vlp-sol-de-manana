@@ -23,12 +23,11 @@ export const mainKeyboard = new Keyboard()
 const translateKeyboard = new InlineKeyboard().text("🇷🇺 Перевести", "translate");
 
 const RECOMMENDATIONS =
-  `Как получать максимум от практики:\n\n` +
-  `— Пиши полными предложениями — это главное условие прогресса.\n` +
-  `— Используй испанский, даже если не уверен. Ошибки исправлю.\n` +
-  `— Не знаешь слово — опиши его по-испански.\n` +
-  `— Можно писать по-русски — переведу и продолжим на испанском.\n` +
-  `— Тему можно сменить в любой момент.`;
+  `Некоторые рекомендации по работе с ботом, которые способствуют изучению языка:\n\n` +
+  `— Пишите полными предложениями и давайте развернутые ответы.\n` +
+  `— Старайтесь всегда писать на испанском языке, бот выделит ошибки.\n` +
+  `— Можете написать ответ полностью или частично на русском языке.\n` +
+  `— Меняйте тему в любой момент и изучайте лексику.`;
 
 // Rejects null, bare "null", and LLM artifacts like ":null," or "null,"
 function meaningful(s: string | null): s is string {
@@ -120,14 +119,24 @@ export async function handleStart(ctx: Context): Promise<void> {
   }
 }
 
-export async function handleTopicMenu(ctx: Context): Promise<void> {
-  const themes = pickRandomThemes(8);
+function buildTopicKeyboard(): InlineKeyboard {
+  const themes = pickRandomThemes(7);
   const keyboard = new InlineKeyboard();
   themes.forEach((theme, i) => {
     keyboard.text(THEME_LABELS[theme] ?? theme, `topic:${theme}`);
     if (i % 2 === 1) keyboard.row();
   });
-  await ctx.reply("Выбери тему для разговора:", { reply_markup: keyboard });
+  keyboard.text("Другие темы →", "more_themes");
+  return keyboard;
+}
+
+export async function handleTopicMenu(ctx: Context): Promise<void> {
+  await ctx.reply("Выбери тему для разговора:", { reply_markup: buildTopicKeyboard() });
+}
+
+export async function handleMoreThemes(ctx: Context): Promise<void> {
+  await ctx.answerCallbackQuery();
+  await ctx.editMessageReplyMarkup({ reply_markup: buildTopicKeyboard() });
 }
 
 export async function handleTopicCallback(ctx: Context): Promise<void> {
@@ -213,6 +222,13 @@ export async function handleMessage(ctx: Context): Promise<void> {
       );
     }
   }
+}
+
+const MEDIA_WARNING =
+  "Я принимаю только текстовые сообщения. Напиши что-нибудь по-испански или по-русски. / Solo acepto mensajes de texto.";
+
+export async function handleUnsupportedMedia(ctx: Context): Promise<void> {
+  await ctx.reply(MEDIA_WARNING);
 }
 
 export async function handleTranslate(ctx: Context): Promise<void> {
