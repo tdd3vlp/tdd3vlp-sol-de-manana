@@ -126,7 +126,7 @@ export async function handleStart(ctx: Context): Promise<void> {
     await saveMessage(chat.id, "assistant", rawText, JSON.stringify(response));
     await ctx.reply(formatForTelegram(rawText), {
       parse_mode: "HTML",
-      reply_markup: translateKeyboard,
+      reply_markup: mainKeyboard,
     });
   } catch (error) {
     console.error("handleStart error:", error);
@@ -176,7 +176,7 @@ export async function handleTopicCallback(ctx: Context): Promise<void> {
     await saveMessage(chat.id, "assistant", rawText, JSON.stringify(response));
     await ctx.reply(formatForTelegram(rawText), {
       parse_mode: "HTML",
-      reply_markup: translateKeyboard,
+      reply_markup: mainKeyboard,
     });
   } catch (error) {
     console.error("handleTopicCallback error:", error);
@@ -251,6 +251,15 @@ export async function handleUnsupportedMedia(ctx: Context): Promise<void> {
   await ctx.reply(MEDIA_WARNING);
 }
 
+function stripCorrectionLine(text: string): string {
+  const paragraphs = text.split("\n\n");
+  const first = paragraphs[0].trimStart();
+  if (/^(Corrección:|En español:)/i.test(first)) {
+    return paragraphs.slice(1).join("\n\n").trim();
+  }
+  return text;
+}
+
 export async function handleTranslate(ctx: Context): Promise<void> {
   const originalText = ctx.callbackQuery?.message?.text;
   if (!originalText) {
@@ -260,8 +269,10 @@ export async function handleTranslate(ctx: Context): Promise<void> {
 
   await ctx.answerCallbackQuery();
 
+  const textToTranslate = stripCorrectionLine(originalText);
+
   try {
-    const translation = await translateToRussian(originalText);
+    const translation = await translateToRussian(textToTranslate);
     await ctx.reply(translation, {
       reply_parameters: { message_id: ctx.callbackQuery!.message!.message_id },
     });

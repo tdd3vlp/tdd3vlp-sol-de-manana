@@ -377,6 +377,11 @@ If a testing engineer agent is available, use it to review edge cases and missin
 
 Do not create large mixed commits.
 
+## Collaboration Rules
+
+- Before making any change, briefly explain what you are going to do and how. Wait for the user to confirm before proceeding.
+- After every fix or addition, create a git commit with a conventional commit message.
+
 ## MVP Definition of Done
 
 The MVP is done when:
