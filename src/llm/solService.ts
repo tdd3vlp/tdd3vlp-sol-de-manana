@@ -6,6 +6,7 @@ import { buildSystemPrompt, buildStartSystemPrompt } from "../prompts/solSystemP
 import { config } from "../config/env.js";
 import type { Chat } from "@prisma/client";
 import type { LLMMessage } from "../conversation/context.js";
+import { isNonsense } from "../conversation/language.js";
 
 export class SolServiceError extends Error {
   constructor(message: string) {
@@ -93,6 +94,15 @@ export async function callSol(
   history: LLMMessage[],
   chat: Chat
 ): Promise<SolResponse> {
+  if (isNonsense(userText)) {
+    return {
+      inputLanguage: "nonsense",
+      correctionOrTranslation: null,
+      continuation: "Por favor, escribe en español o ruso para que podamos continuar.",
+      theme: chat.currentTheme,
+    };
+  }
+
   const baseMessages: ChatCompletionMessageParam[] = [
     { role: "system", content: buildSystemPrompt(chat.currentTheme) },
     ...history.map((m) => ({ role: m.role, content: m.content })),

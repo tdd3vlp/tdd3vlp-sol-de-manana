@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { makeSolResponse, makeChat } from "../src/testing/fixtures.js";
 import { assembleMessage } from "../src/bot/handlers.js";
+import { isNonsense } from "../src/conversation/language.js";
 
 vi.mock("../src/config/env.js", () => ({
   config: {
@@ -29,6 +30,41 @@ import { callSol } from "../src/llm/solService.js";
 
 beforeEach(() => {
   vi.clearAllMocks();
+});
+
+describe("isNonsense pre-filter", () => {
+  it.each([
+    "asdfghjkl",
+    "qwrtpsdfg",
+    "12345",
+    "!!! ???",
+    "...",
+    "🎉🎉🎉",
+    "   ",
+  ])("classifies %j as nonsense", (input) => {
+    expect(isNonsense(input)).toBe(true);
+  });
+
+  it.each([
+    "Hola",
+    "sí",
+    "yo",
+    "no",
+    "нет",
+    "да",
+    "Quiero ir al mercado",
+    "Я хочу учить испанский",
+    "Vivo en Madrid",
+  ])("classifies %j as not nonsense", (input) => {
+    expect(isNonsense(input)).toBe(false);
+  });
+
+  it("callSol returns nonsense response without calling OpenAI", async () => {
+    const result = await callSol("asdfghjkl 12345 !!!", [], makeChat());
+    expect(openai.beta.chat.completions.parse).not.toHaveBeenCalled();
+    expect(result.inputLanguage).toBe("nonsense");
+    expect(result.correctionOrTranslation).toBeNull();
+  });
 });
 
 describe("Semantic validation (null artifact detection)", () => {
