@@ -23,11 +23,6 @@ export const PLAN_PRICES_STARS: Record<Exclude<Plan, "free">, number> = {
   premium: 600,
 };
 
-export const PLAN_PRICES_RUB: Record<Exclude<Plan, "free">, number> = {
-  basic: 299,
-  premium: 899,
-};
-
 export function isAdminUser(telegramUserId: string): boolean {
   return config.adminTelegramIds.includes(telegramUserId);
 }

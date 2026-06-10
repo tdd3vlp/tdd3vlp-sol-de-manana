@@ -30,7 +30,6 @@ import {
 import { isNonsense, isLikelyUnsupported } from "../conversation/language.js";
 import {
   PLAN_PRICES_STARS,
-  PLAN_PRICES_RUB,
   getPlanModel,
   getEffectivePlan,
   PLAN_LIMITS,
@@ -117,15 +116,6 @@ async function sendSubscriptionInvoice(
     { reply_markup: new InlineKeyboard().url(`Оплатить ${stars} ⭐`, link) },
   );
 }
-
-const TIPS =
-  `Некоторые рекомендации по работе с ботом, которые способствуют изучению языка:\n\n` +
-  `— Пишите полными предложениями и давайте развернутые ответы.\n` +
-  `— Старайтесь всегда писать на испанском языке, бот выделит ошибки.\n` +
-  `— Можете написать ответ полностью или частично на русском языке.\n` +
-  `— Меняйте тему в любой момент и изучайте лексику.`;
-
-const HELP = `Если у вас возникли вопросы или предложения, напишите менеджеру.\n\nМенеджер отвечает в течение 24 часов.`;
 
 function meaningful(s: string | null): s is string {
   if (!s) return false;
@@ -418,17 +408,6 @@ async function showTopicMenu(ctx: Context, isPremium: boolean): Promise<void> {
   });
 }
 
-export async function handleTopicMenu(ctx: Context): Promise<void> {
-  await ctx.answerCallbackQuery();
-  const telegramChatId = ctx.chat?.id?.toString();
-  const telegramUserId = ctx.from?.id?.toString();
-  const plan = telegramChatId
-    ? getEffectivePlan(await getOrCreateChat(telegramChatId, pickRandomTheme()))
-    : "free";
-  const isPremium = plan === "premium" || !!(telegramUserId && isAdminUser(telegramUserId));
-  await showTopicMenu(ctx, isPremium);
-}
-
 export async function handleMoreThemes(ctx: Context): Promise<void> {
   await ctx.answerCallbackQuery();
   const telegramChatId = ctx.chat?.id?.toString();
@@ -542,38 +521,6 @@ export async function handleTopicCallback(ctx: Context): Promise<void> {
       "Lo siento, ocurrió un error. Por favor, inténtalo de nuevo.",
     );
   }
-}
-
-// ─── Misc handlers ────────────────────────────────────────────────────────────
-
-export async function handleContinueDialogue(ctx: Context): Promise<void> {
-  await ctx.answerCallbackQuery();
-  const telegramChatId = ctx.chat?.id?.toString();
-  const telegramUserId = ctx.from?.id?.toString();
-  const plan = telegramChatId
-    ? getEffectivePlan(await getOrCreateChat(telegramChatId, pickRandomTheme()))
-    : "free";
-  await ctx.reply("Продолжаем! Напиши что-нибудь по-испански или по-русски.", {
-    reply_markup: buildDialogueKeyboard(plan, telegramUserId),
-  });
-}
-
-export async function handleTips(ctx: Context): Promise<void> {
-  await ctx.reply(TIPS);
-}
-
-export async function handleTipsCallback(ctx: Context): Promise<void> {
-  await ctx.answerCallbackQuery();
-  await ctx.reply(TIPS);
-}
-
-export async function handleHelp(ctx: Context): Promise<void> {
-  await ctx.reply(HELP, {
-    reply_markup: new InlineKeyboard().url(
-      "Связаться с менеджером",
-      "https://t.me/tdd3vlp",
-    ),
-  });
 }
 
 // ─── Main message handler ─────────────────────────────────────────────────────
@@ -694,21 +641,6 @@ export async function handleMessage(ctx: Context): Promise<void> {
 }
 
 // ─── Subscription handlers ────────────────────────────────────────────────────
-
-export async function handleSubscribe(ctx: Context): Promise<void> {
-  if (config.webAppUrl) {
-    const keyboard = new InlineKeyboard().webApp("Выбрать тариф", config.webAppUrl);
-    await ctx.reply("Тарифы Sol de Mañana:", { reply_markup: keyboard });
-  } else {
-    const keyboard = buildSubscribeKeyboard()
-      .row()
-      .text("Продолжить диалог →", "continue_dialogue");
-    await ctx.reply(
-      `Подписка Sol de Mañana:\n\nBasic — ${PLAN_PRICES_RUB.basic} ₽ / ${PLAN_PRICES_STARS.basic} ⭐ — 100 сообщений в день\nPremium — ${PLAN_PRICES_RUB.premium} ₽ / ${PLAN_PRICES_STARS.premium} ⭐ — 300 сообщений в день`,
-      { reply_markup: keyboard },
-    );
-  }
-}
 
 export async function handleWebAppData(ctx: Context): Promise<void> {
   const data = ctx.message?.web_app_data?.data;
