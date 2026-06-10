@@ -20,6 +20,7 @@ export function makeChat(overrides: Partial<Chat> = {}): Chat {
     themeReplyCount: 0,
     plan: "free",
     mode: "dialogue",
+    lockTheme: false,
     dailyMessageCount: 0,
     dailyResetAt: new Date(),
     createdAt: new Date(),

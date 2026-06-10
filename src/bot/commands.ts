@@ -5,6 +5,7 @@ import {
   handleTopicCallback,
   handleTopicMenu,
   handleMoreThemes,
+  handleCustomTopicCallback,
   handleUnsupportedMedia,
   handleTips,
   handleHelp,
@@ -34,6 +35,7 @@ export function registerCommands(bot: Bot): void {
   bot.callbackQuery("topic_menu", handleTopicMenu);
   bot.callbackQuery(/^topic:/, handleTopicCallback);
   bot.callbackQuery("more_themes", handleMoreThemes);
+  bot.callbackQuery("custom_topic", handleCustomTopicCallback);
   bot.callbackQuery(/^pay:/, handleDirectPayCallback);
   bot.callbackQuery("mode_dialogue", handleModeDialogueCallback);
   bot.callbackQuery("mode_translation", handleModeTranslationCallback);

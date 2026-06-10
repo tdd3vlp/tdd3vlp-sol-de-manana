@@ -83,6 +83,18 @@ export async function updateChatMode(chatId: string, mode: string): Promise<Chat
   });
 }
 
+export async function updateChatThemeAndLock(
+  chatId: string,
+  theme: string,
+  count: number,
+  lock: boolean,
+): Promise<Chat> {
+  return prisma.chat.update({
+    where: { id: chatId },
+    data: { currentTheme: theme, themeReplyCount: count, lockTheme: lock },
+  });
+}
+
 export async function upgradeChatPlan(
   telegramChatId: string,
   plan: string

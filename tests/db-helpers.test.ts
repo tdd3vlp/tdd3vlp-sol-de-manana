@@ -32,6 +32,7 @@ const mockChat = {
   themeReplyCount: 3,
   plan: "free",
   mode: "dialogue",
+  lockTheme: false,
   dailyMessageCount: 0,
   dailyResetAt: new Date(),
   createdAt: new Date(),

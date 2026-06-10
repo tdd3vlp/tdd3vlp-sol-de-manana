@@ -6,6 +6,7 @@ import {
   saveMessage,
   getRecentMessages,
   updateChatTheme,
+  updateChatThemeAndLock,
   updateChatMode,
   resetChat,
   checkAndMaybeReset,
@@ -41,6 +42,7 @@ const WELCOME_STICKER_ID =
 const BTN_TOPIC_MENU = "Выбор темы";
 const BTN_MODE_TRANSLATION = "Режим перевода";
 const BTN_MODE_DIALOGUE = "Режим диалога";
+const BTN_CUSTOM_TOPIC = "Своя тема";
 
 function buildDialogueKeyboard(plan: string, userId?: string): Keyboard {
   const kb = new Keyboard().text(BTN_TOPIC_MENU);
@@ -354,31 +356,103 @@ async function handleTranslationInput(
 
 // ─── Topic menu ───────────────────────────────────────────────────────────────
 
-function buildTopicKeyboard(): InlineKeyboard {
+function buildTopicKeyboard(isPremium: boolean): InlineKeyboard {
   const themes = pickRandomThemes(7);
   const keyboard = new InlineKeyboard();
   themes.forEach((theme, i) => {
     keyboard.text(THEME_LABELS[theme] ?? theme, `topic:${theme}`);
     if (i % 2 === 1) keyboard.row();
   });
-  keyboard.text("Другие темы →", "more_themes");
+  if (isPremium) {
+    keyboard.row().text(`${BTN_CUSTOM_TOPIC} →`, "custom_topic");
+  } else {
+    keyboard.text("Другие темы →", "more_themes");
+  }
   return keyboard;
 }
 
-async function showTopicMenu(ctx: Context): Promise<void> {
+async function showTopicMenu(ctx: Context, isPremium: boolean): Promise<void> {
   await ctx.reply("Выбери тему для разговора:", {
-    reply_markup: buildTopicKeyboard(),
+    reply_markup: buildTopicKeyboard(isPremium),
   });
 }
 
 export async function handleTopicMenu(ctx: Context): Promise<void> {
   await ctx.answerCallbackQuery();
-  await showTopicMenu(ctx);
+  const telegramChatId = ctx.chat?.id?.toString();
+  const telegramUserId = ctx.from?.id?.toString();
+  const plan = telegramChatId
+    ? (await getOrCreateChat(telegramChatId, pickRandomTheme())).plan
+    : "free";
+  const isPremium = plan === "premium" || !!(telegramUserId && isAdminUser(telegramUserId));
+  await showTopicMenu(ctx, isPremium);
 }
 
 export async function handleMoreThemes(ctx: Context): Promise<void> {
   await ctx.answerCallbackQuery();
-  await ctx.editMessageReplyMarkup({ reply_markup: buildTopicKeyboard() });
+  const telegramChatId = ctx.chat?.id?.toString();
+  const telegramUserId = ctx.from?.id?.toString();
+  const plan = telegramChatId
+    ? (await getOrCreateChat(telegramChatId, pickRandomTheme())).plan
+    : "free";
+  const isPremium = plan === "premium" || !!(telegramUserId && isAdminUser(telegramUserId));
+  await ctx.editMessageReplyMarkup({ reply_markup: buildTopicKeyboard(isPremium) });
+}
+
+async function handleCustomTopicInput(
+  ctx: Context,
+  userText: string,
+  chat: Awaited<ReturnType<typeof getOrCreateChat>>,
+  telegramUserId: string | undefined,
+): Promise<void> {
+  if (userText.length > 200) {
+    await ctx.reply("Тема слишком длинная. Напиши покороче — одним предложением.");
+    return;
+  }
+
+  const { allowed, chat: freshChat } = await checkAndMaybeReset(chat, telegramUserId);
+  if (!allowed) {
+    await sendPaywall(ctx);
+    return;
+  }
+  chat = freshChat;
+
+  chat = await updateChatThemeAndLock(chat.id, userText, 0, true);
+  await updateChatMode(chat.id, "dialogue");
+
+  try {
+    const response = await callSolStart(chat);
+    await incrementDailyCount(chat.id);
+    const rawText = assembleMessage(response);
+    await saveMessage(chat.id, "assistant", rawText, JSON.stringify(response));
+    await ctx.reply(
+      formatForTelegram(rawText) + buildSpoiler(response.russianTranslation),
+      { parse_mode: "HTML", reply_markup: buildDialogueKeyboard(chat.plan, telegramUserId) },
+    );
+  } catch (error) {
+    console.error("handleCustomTopicInput error:", error);
+    await ctx.reply("Lo siento, ocurrió un error. Por favor, inténtalo de nuevo.");
+  }
+}
+
+export async function handleCustomTopicCallback(ctx: Context): Promise<void> {
+  await ctx.answerCallbackQuery();
+  const telegramChatId = ctx.chat?.id?.toString();
+  const telegramUserId = ctx.from?.id?.toString();
+  if (!telegramChatId) return;
+
+  const chat = await getOrCreateChat(telegramChatId, pickRandomTheme());
+  if (chat.plan !== "premium" && !(telegramUserId && isAdminUser(telegramUserId))) {
+    await ctx.reply("Своя тема доступна только на тарифе Premium.", {
+      reply_markup: buildSubscribeKeyboard(),
+    });
+    return;
+  }
+
+  await updateChatMode(chat.id, "awaiting_custom_topic");
+  await ctx.reply(
+    "Напиши тему, которую хочешь обсудить — на русском или испанском.",
+  );
 }
 
 export async function handleTopicCallback(ctx: Context): Promise<void> {
@@ -391,7 +465,7 @@ export async function handleTopicCallback(ctx: Context): Promise<void> {
   if (!telegramChatId) return;
 
   let chat = await getOrCreateChat(telegramChatId, theme);
-  chat = await updateChatTheme(chat.id, theme, 0);
+  chat = await updateChatThemeAndLock(chat.id, theme, 0, false);
   await updateChatMode(chat.id, "dialogue");
 
   const { allowed, chat: freshChat } = await checkAndMaybeReset(
@@ -471,7 +545,10 @@ export async function handleMessage(ctx: Context): Promise<void> {
     return;
   }
   if (userText === BTN_TOPIC_MENU) {
-    await showTopicMenu(ctx);
+    const chat = await getOrCreateChat(telegramChatId, pickRandomTheme());
+    const isPremium =
+      chat.plan === "premium" || !!(telegramUserId && isAdminUser(telegramUserId));
+    await showTopicMenu(ctx, isPremium);
     return;
   }
 
@@ -493,6 +570,12 @@ export async function handleMessage(ctx: Context): Promise<void> {
   // Route to translation mode if active
   if (chat.mode === "translation") {
     await handleTranslationInput(ctx, userText);
+    return;
+  }
+
+  // Handle custom topic input
+  if (chat.mode === "awaiting_custom_topic") {
+    await handleCustomTopicInput(ctx, userText, chat, telegramUserId);
     return;
   }
 
@@ -524,7 +607,7 @@ export async function handleMessage(ctx: Context): Promise<void> {
     let newCount = chat.themeReplyCount + 1;
     let currentTheme = chat.currentTheme;
 
-    if (shouldChangeTheme(newCount)) {
+    if (!chat.lockTheme && shouldChangeTheme(newCount)) {
       currentTheme = pickRandomTheme();
       newCount = 0;
     }
