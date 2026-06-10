@@ -17,4 +17,5 @@ export const config = {
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean),
+  webAppUrl: process.env.WEBAPP_URL ?? "",
 } as const;

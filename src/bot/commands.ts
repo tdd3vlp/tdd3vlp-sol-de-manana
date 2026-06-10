@@ -10,6 +10,7 @@ import {
   handleTips,
   handleHelp,
   handleSubscribe,
+  handleWebAppData,
   handleContinueDialogue,
   handleDirectPayCallback,
   handlePreCheckout,
@@ -27,6 +28,7 @@ export function registerCommands(bot: Bot): void {
   bot.command("subscribe", handleSubscribe);
   bot.command("myid", handleMyId);
   bot.command("setplan", handleSetPlan);
+  bot.on("message:web_app_data", handleWebAppData);
   bot.on("message:text", handleMessage);
   bot.on("message:successful_payment", handleSuccessfulPayment);
   bot.on("pre_checkout_query", handlePreCheckout);

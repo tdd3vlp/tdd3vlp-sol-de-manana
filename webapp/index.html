@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Sol de Mañana — Тарифы</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    :root {
+      --bg:            #F7EFE1;
+      --card-bg:       #FFFFFF;
+      --accent:        #D4751A;
+      --accent-dark:   #A85510;
+      --text:          #1C1C1E;
+      --text-sub:      #7A6E64;
+      --border:        #E8D9C4;
+      --border-basic:  #D4751A;
+      --border-prem:   #A85510;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      padding-bottom: 28px;
+    }
+
+    /* ── Header ── */
+    .header {
+      padding: 22px 16px 14px;
+      text-align: center;
+    }
+    .header-title {
+      font-size: 21px;
+      font-weight: 700;
+      color: var(--accent);
+      letter-spacing: -0.3px;
+      margin-bottom: 7px;
+    }
+    .header-sub {
+      font-size: 13px;
+      color: var(--text-sub);
+      line-height: 1.55;
+      max-width: 300px;
+      margin: 0 auto;
+    }
+
+    /* ── Cards ── */
+    .plans {
+      padding: 0 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .plan-card {
+      background: var(--card-bg);
+      border-radius: 16px;
+      border: 1.5px solid var(--border);
+      overflow: hidden;
+    }
+    .plan-card.basic  { border-color: var(--border-basic); }
+    .plan-card.premium { border-color: var(--border-prem); }
+
+    /* ── Plan header (always visible) ── */
+    .plan-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 16px;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+
+    .plan-info { display: flex; flex-direction: column; gap: 3px; }
+
+    .plan-name-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .plan-name {
+      font-size: 16px;
+      font-weight: 700;
+    }
+    .badge {
+      font-size: 10px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 20px;
+      letter-spacing: 0.2px;
+    }
+    .badge-basic   { background: #FEF3C7; color: #92400E; }
+    .badge-premium { background: #FDE8D0; color: #7C2D12; }
+
+    .plan-price {
+      font-size: 13px;
+      color: var(--text-sub);
+    }
+
+    .plan-arrow {
+      flex-shrink: 0;
+      width: 28px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-sub);
+      transition: transform 0.25s ease;
+    }
+    .plan-card.open .plan-arrow { transform: rotate(180deg); }
+
+    /* ── Accordion body ── */
+    .plan-body {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .plan-card.open .plan-body { max-height: 700px; }
+
+    .plan-body-inner {
+      padding: 0 16px 16px;
+    }
+    .plan-divider {
+      height: 1px;
+      background: var(--border);
+      margin-bottom: 13px;
+    }
+    .plan-tagline {
+      font-size: 13px;
+      color: var(--text-sub);
+      line-height: 1.55;
+      margin-bottom: 12px;
+    }
+    .plan-features {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .plan-features li {
+      font-size: 13px;
+      line-height: 1.45;
+      display: flex;
+      gap: 8px;
+    }
+    .plan-features li::before {
+      content: "✓";
+      color: var(--accent);
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    /* ── CTA buttons ── */
+    .plan-cta {
+      width: 100%;
+      padding: 13px;
+      border: none;
+      border-radius: 10px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.15s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .plan-cta:active { opacity: 0.72; }
+    .cta-free    { background: #EFE4D0; color: var(--accent-dark); }
+    .cta-basic   { background: var(--accent);      color: #fff; }
+    .cta-premium { background: var(--accent-dark); color: #fff; }
+
+    /* ── Footer note ── */
+    .footer {
+      margin: 14px 12px 0;
+      padding: 13px 15px;
+      background: rgba(255,255,255,0.55);
+      border-radius: 12px;
+      font-size: 12px;
+      color: var(--text-sub);
+      line-height: 1.6;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <div class="header-title">Sol de Mañana</div>
+    <div class="header-sub">Учите испанский в живом диалоге — Sol исправляет ошибки, помогает с переводом и ведёт разговор на темы, нужные в Испании.</div>
+  </div>
+
+  <div class="plans">
+
+    <!-- FREE -->
+    <div class="plan-card" data-plan="free">
+      <div class="plan-header">
+        <div class="plan-info">
+          <div class="plan-name-row">
+            <span class="plan-name">Free</span>
+          </div>
+          <span class="plan-price">Бесплатно</span>
+        </div>
+        <div class="plan-arrow">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+      </div>
+      <div class="plan-body">
+        <div class="plan-body-inner">
+          <div class="plan-divider"></div>
+          <p class="plan-tagline">Для знакомства с Sol и первых коротких практик.</p>
+          <ul class="plan-features">
+            <li>10 сообщений в день</li>
+            <li>Базовая модель GPT-4o mini</li>
+            <li>Диалог на испанском для начинающих</li>
+            <li>Исправление ошибок в испанских фразах</li>
+            <li>Перевод русских фраз на испанский</li>
+            <li>Готовые темы для повседневных ситуаций в Испании</li>
+          </ul>
+          <button class="plan-cta cta-free" data-action="free">Начать бесплатно</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- BASIC -->
+    <div class="plan-card basic" data-plan="basic">
+      <div class="plan-header">
+        <div class="plan-info">
+          <div class="plan-name-row">
+            <span class="plan-name">Basic</span>
+            <span class="badge badge-basic">Оптимально для старта</span>
+          </div>
+          <span class="plan-price">299 ₽ / 200 ⭐ в месяц</span>
+        </div>
+        <div class="plan-arrow">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+      </div>
+      <div class="plan-body">
+        <div class="plan-body-inner">
+          <div class="plan-divider"></div>
+          <p class="plan-tagline">Для регулярной практики с более сильной языковой моделью.</p>
+          <ul class="plan-features">
+            <li>100 сообщений в день</li>
+            <li>Продвинутая модель GPT-4o</li>
+            <li>Более точные исправления грамматики, акцентов, пунктуации и стиля</li>
+            <li>Более естественные ответы в диалоге</li>
+            <li>Подсказки-переводы на русском, чтобы понимать смысл</li>
+            <li>Выбор готовых тем: переезд, квартира, кафе, документы, врач, транспорт и другие</li>
+          </ul>
+          <button class="plan-cta cta-basic" data-action="pay:basic">Выбрать Basic</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- PREMIUM -->
+    <div class="plan-card premium" data-plan="premium">
+      <div class="plan-header">
+        <div class="plan-info">
+          <div class="plan-name-row">
+            <span class="plan-name">Premium</span>
+            <span class="badge badge-premium">Максимум возможностей</span>
+          </div>
+          <span class="plan-price">899 ₽ / 600 ⭐ в месяц</span>
+        </div>
+        <div class="plan-arrow">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+      </div>
+      <div class="plan-body">
+        <div class="plan-body-inner">
+          <div class="plan-divider"></div>
+          <p class="plan-tagline">Максимум возможностей для тех, кто учит испанский всерьёз.</p>
+          <ul class="plan-features">
+            <li>300 сообщений в день</li>
+            <li>Продвинутая модель GPT-4o</li>
+            <li>Все возможности Basic</li>
+            <li>Режим перевода: русский ↔ испанский</li>
+            <li>Своя тема для разговора</li>
+            <li>Больше пространства для длинных диалогов и ежедневной практики</li>
+            <li>Подготовка к реальным ситуациям: аренда, документы, собеседования, медицина, общение с соседями</li>
+          </ul>
+          <button class="plan-cta cta-premium" data-action="pay:premium">Выбрать Premium</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="footer">
+    Sol de Mañana не просто отвечает на вопросы. Он ведёт живой диалог на испанском, мягко исправляет ошибки и помогает постепенно говорить увереннее. Можно писать по-испански, по-русски или смешивать языки — Sol подскажет естественную фразу и продолжит разговор.
+  </div>
+
+  <script>
+    const tg = window.Telegram?.WebApp;
+
+    if (tg) {
+      tg.ready();
+      tg.expand();
+      tg.setBackgroundColor("#F7EFE1");
+      tg.setHeaderColor("#F7EFE1");
+    }
+
+    // Accordion
+    document.querySelectorAll(".plan-header").forEach((header) => {
+      header.addEventListener("click", () => {
+        const card = header.closest(".plan-card");
+        const isOpen = card.classList.contains("open");
+        document.querySelectorAll(".plan-card.open").forEach((c) => c.classList.remove("open"));
+        if (!isOpen) card.classList.add("open");
+      });
+    });
+
+    // CTA
+    document.querySelectorAll(".plan-cta").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const action = btn.dataset.action;
+        if (action === "free") {
+          tg ? tg.close() : window.close();
+          return;
+        }
+        if (tg) tg.sendData(action);
+      });
+    });
+  </script>
+</body>
+</html>
