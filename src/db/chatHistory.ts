@@ -158,11 +158,22 @@ export async function resetChat(
 ): Promise<Chat> {
   const chat = await prisma.chat.findUnique({ where: { telegramChatId } });
   if (chat) {
-    await prisma.message.deleteMany({ where: { chatId: chat.id } });
-    return prisma.chat.update({
-      where: { id: chat.id },
-      data: { currentTheme: newTheme, themeReplyCount: 0 },
-    });
+    // Transaction: history must not be wiped if the state update fails.
+    // Also clear mode/lockTheme so /start never leaves the user stuck in
+    // translation or awaiting_custom_topic mode.
+    const [, updated] = await prisma.$transaction([
+      prisma.message.deleteMany({ where: { chatId: chat.id } }),
+      prisma.chat.update({
+        where: { id: chat.id },
+        data: {
+          currentTheme: newTheme,
+          themeReplyCount: 0,
+          mode: "dialogue",
+          lockTheme: false,
+        },
+      }),
+    ]);
+    return updated;
   }
   return prisma.chat.create({
     data: { telegramChatId, currentTheme: newTheme, themeReplyCount: 0 },

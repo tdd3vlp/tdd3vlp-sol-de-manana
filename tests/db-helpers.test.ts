@@ -13,6 +13,7 @@ vi.mock("../src/db/prisma.js", () => ({
       findMany: vi.fn(),
       deleteMany: vi.fn(),
     },
+    $transaction: vi.fn(async (ops: unknown[]) => Promise.all(ops)),
   },
 }));
 
@@ -139,7 +140,7 @@ describe("updateChatTheme", () => {
 });
 
 describe("resetChat", () => {
-  it("deletes messages and resets theme when chat exists", async () => {
+  it("deletes messages and resets theme and mode in a transaction when chat exists", async () => {
     vi.mocked(prisma.chat.findUnique).mockResolvedValue(mockChat);
     vi.mocked(prisma.message.deleteMany).mockResolvedValue({ count: 5 });
     vi.mocked(prisma.chat.update).mockResolvedValue({
@@ -150,10 +151,16 @@ describe("resetChat", () => {
 
     await resetChat("123", "moving to Spain");
 
+    expect(prisma.$transaction).toHaveBeenCalledOnce();
     expect(prisma.message.deleteMany).toHaveBeenCalledWith({ where: { chatId: "chat-1" } });
     expect(prisma.chat.update).toHaveBeenCalledWith({
       where: { id: "chat-1" },
-      data: { currentTheme: "moving to Spain", themeReplyCount: 0 },
+      data: {
+        currentTheme: "moving to Spain",
+        themeReplyCount: 0,
+        mode: "dialogue",
+        lockTheme: false,
+      },
     });
   });
 
