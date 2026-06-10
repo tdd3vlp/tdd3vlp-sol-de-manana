@@ -19,8 +19,13 @@ export function getPlanModel(plan: string): string {
 }
 
 export const PLAN_PRICES_STARS: Record<Exclude<Plan, "free">, number> = {
-  basic: 150,
-  premium: 500,
+  basic: 200,
+  premium: 600,
+};
+
+export const PLAN_PRICES_RUB: Record<Exclude<Plan, "free">, number> = {
+  basic: 299,
+  premium: 899,
 };
 
 export function isAdminUser(telegramUserId: string): boolean {

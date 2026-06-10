@@ -29,6 +29,7 @@ import {
 import { isNonsense, isLikelyUnsupported } from "../conversation/language.js";
 import {
   PLAN_PRICES_STARS,
+  PLAN_PRICES_RUB,
   getPlanModel,
   PLAN_LIMITS,
   isAdminUser,
@@ -63,9 +64,9 @@ function buildMainMenuKeyboard(): InlineKeyboard {
 
 function buildSubscribeKeyboard(): InlineKeyboard {
   return new InlineKeyboard()
-    .text(`Basic — ${PLAN_PRICES_STARS.basic} ⭐`, "pay:basic")
+    .text("Выбрать Basic", "pay:basic")
     .row()
-    .text(`Premium — ${PLAN_PRICES_STARS.premium} ⭐`, "pay:premium");
+    .text("Выбрать Premium", "pay:premium");
 }
 
 async function sendPaywall(ctx: Context): Promise<void> {
@@ -637,16 +638,48 @@ export async function handleMessage(ctx: Context): Promise<void> {
 
 // ─── Subscription handlers ────────────────────────────────────────────────────
 
+const SUBSCRIBE_MESSAGE =
+  `<b>Выберите формат практики с Sol de Mañana</b>\n\n` +
+  `Учите испанский в живом диалоге: Sol исправляет ошибки, помогает переводить мысли на испанский и ведёт разговор на темы, которые пригодятся в Испании.\n\n` +
+  `──────────────\n\n` +
+  `<b>Free</b> — бесплатно\n` +
+  `Для знакомства с Sol и первых коротких практик.\n\n` +
+  `• 10 сообщений в день\n` +
+  `• Базовая модель GPT-4o mini\n` +
+  `• Диалог на испанском для начинающих\n` +
+  `• Исправление ошибок в испанских фразах\n` +
+  `• Перевод русских фраз на испанский\n` +
+  `• Готовые темы для повседневных ситуаций в Испании\n\n` +
+  `──────────────\n\n` +
+  `<b>Basic</b> — ${PLAN_PRICES_RUB.basic} ₽ / ${PLAN_PRICES_STARS.basic} ⭐\n` +
+  `Для регулярной практики с более сильной языковой моделью.\n\n` +
+  `• 100 сообщений в день\n` +
+  `• Продвинутая модель GPT-4o\n` +
+  `• Более точные исправления грамматики, акцентов, пунктуации и стиля\n` +
+  `• Более естественные ответы в диалоге\n` +
+  `• Подсказки-переводы на русском, чтобы понимать смысл\n` +
+  `• Выбор готовых тем: переезд, квартира, кафе, документы, врач, транспорт и другие\n\n` +
+  `──────────────\n\n` +
+  `<b>Premium</b> — ${PLAN_PRICES_RUB.premium} ₽ / ${PLAN_PRICES_STARS.premium} ⭐\n` +
+  `Максимум возможностей для тех, кто учит испанский всерьёз.\n\n` +
+  `• 300 сообщений в день\n` +
+  `• Продвинутая модель GPT-4o\n` +
+  `• Все возможности Basic\n` +
+  `• Режим перевода: русский ↔ испанский\n` +
+  `• Своя тема для разговора\n` +
+  `• Больше пространства для длинных диалогов и ежедневной практики\n` +
+  `• Подходит для подготовки к реальным ситуациям: аренда, документы, собеседования, медицина, общение с соседями\n\n` +
+  `──────────────\n\n` +
+  `Sol de Mañana не просто отвечает на вопросы. Он ведёт с вами живой диалог на испанском, мягко исправляет ошибки и помогает постепенно говорить увереннее. Можно писать по-испански, по-русски или смешивать языки — Sol подскажет естественную испанскую фразу и продолжит разговор.`;
+
 export async function handleSubscribe(ctx: Context): Promise<void> {
-  const keyboard = buildSubscribeKeyboard()
+  const keyboard = new InlineKeyboard()
+    .text("Начать бесплатно", "continue_dialogue")
     .row()
-    .text("Продолжить диалог →", "continue_dialogue");
-  await ctx.reply(
-    "Подписка Sol de Mañana:\n\n" +
-      `Basic — ${PLAN_PRICES_STARS.basic} ⭐ — 100 сообщений в день\n` +
-      `Premium — ${PLAN_PRICES_STARS.premium} ⭐ — 300 сообщений в день`,
-    { reply_markup: keyboard },
-  );
+    .text("Выбрать Basic", "pay:basic")
+    .row()
+    .text("Выбрать Premium", "pay:premium");
+  await ctx.reply(SUBSCRIBE_MESSAGE, { parse_mode: "HTML", reply_markup: keyboard });
 }
 
 export async function handleDirectPayCallback(ctx: Context): Promise<void> {
