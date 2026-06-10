@@ -16,34 +16,23 @@ import { buildLLMContext } from "../conversation/context.js";
 import { pickRandomTheme, pickRandomThemes, shouldChangeTheme, THEME_LABELS } from "../conversation/themes.js";
 import { isNonsense, isLikelyUnsupported } from "../conversation/language.js";
 import { PLAN_PRICES_STARS } from "../subscription/plans.js";
-import { config } from "../config/env.js";
 import type { SolResponse } from "../llm/schemas.js";
 
 const botKeyboard = new InlineKeyboard()
   .text("Выбрать тему", "topic_menu")
   .text("🇷🇺 Перевести", "translate");
 
-function buildSubscribeKeyboard(plan: string): InlineKeyboard {
-  const keyboard = new InlineKeyboard();
-  if (config.webappUrl) {
-    const url = new URL(config.webappUrl);
-    url.searchParams.set("plan", plan);
-    url.searchParams.set("basic_price", String(PLAN_PRICES_STARS.basic));
-    url.searchParams.set("premium_price", String(PLAN_PRICES_STARS.premium));
-    keyboard.webApp("Смотреть тарифы", url.toString());
-  } else {
-    keyboard
-      .text(`Basic — ${PLAN_PRICES_STARS.basic} Stars`, "pay:basic")
-      .row()
-      .text(`Premium — ${PLAN_PRICES_STARS.premium} Stars`, "pay:premium");
-  }
-  return keyboard;
+function buildSubscribeKeyboard(): InlineKeyboard {
+  return new InlineKeyboard()
+    .text(`Basic — ${PLAN_PRICES_STARS.basic} ⭐`, "pay:basic")
+    .row()
+    .text(`Premium — ${PLAN_PRICES_STARS.premium} ⭐`, "pay:premium");
 }
 
-async function sendPaywall(ctx: Context, plan = "free"): Promise<void> {
+async function sendPaywall(ctx: Context): Promise<void> {
   await ctx.reply(
     "На сегодня сообщения закончились.\nОбнови подписку, чтобы продолжить.",
-    { reply_markup: buildSubscribeKeyboard(plan) }
+    { reply_markup: buildSubscribeKeyboard() }
   );
 }
 
@@ -222,7 +211,7 @@ export async function handleTopicCallback(ctx: Context): Promise<void> {
   const { allowed, chat: freshChat } = await checkAndMaybeReset(chat, telegramUserId);
   chat = freshChat;
   if (!allowed) {
-    await sendPaywall(ctx, chat.plan);
+    await sendPaywall(ctx);
     return;
   }
 
@@ -283,7 +272,7 @@ export async function handleMessage(ctx: Context): Promise<void> {
   const { allowed, chat: freshChat } = await checkAndMaybeReset(chat, telegramUserId);
   chat = freshChat;
   if (!allowed) {
-    await sendPaywall(ctx, chat.plan);
+    await sendPaywall(ctx);
     return;
   }
 
@@ -334,24 +323,13 @@ export async function handleMessage(ctx: Context): Promise<void> {
 }
 
 export async function handleSubscribe(ctx: Context): Promise<void> {
-  const telegramChatId = ctx.chat?.id?.toString();
-  let plan = "free";
-  if (telegramChatId) {
-    const chat = await getOrCreateChat(telegramChatId, pickRandomTheme());
-    plan = chat.plan;
-  }
-  const keyboard = buildSubscribeKeyboard(plan).row().text("Продолжить диалог →", "continue_dialogue");
-  await ctx.reply("Подписка Sol de Mañana:", { reply_markup: keyboard });
-}
-
-export async function handleWebAppData(ctx: Context): Promise<void> {
-  const data = ctx.message?.web_app_data?.data;
-  if (!data?.startsWith("subscribe:")) return;
-
-  const plan = data.replace("subscribe:", "");
-  if (plan !== "basic" && plan !== "premium") return;
-
-  await sendSubscriptionInvoice(ctx, plan);
+  const keyboard = buildSubscribeKeyboard().row().text("Продолжить диалог →", "continue_dialogue");
+  await ctx.reply(
+    "Подписка Sol de Mañana:\n\n" +
+    `Basic — ${PLAN_PRICES_STARS.basic} ⭐ — 100 сообщений в день\n` +
+    `Premium — ${PLAN_PRICES_STARS.premium} ⭐ — 300 сообщений в день`,
+    { reply_markup: keyboard }
+  );
 }
 
 export async function handleDirectPayCallback(ctx: Context): Promise<void> {
