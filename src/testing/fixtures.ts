@@ -18,6 +18,7 @@ export function makeChat(overrides: Partial<Chat> = {}): Chat {
     currentTheme: "moving to Spain",
     themeReplyCount: 0,
     plan: "free",
+    mode: "dialogue",
     dailyMessageCount: 0,
     dailyResetAt: new Date(),
     createdAt: new Date(),

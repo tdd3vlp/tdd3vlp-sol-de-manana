@@ -19,6 +19,7 @@ vi.mock("../src/db/chatHistory.js", () => ({
   saveMessage: vi.fn(),
   getRecentMessages: vi.fn(),
   updateChatTheme: vi.fn(),
+  updateChatMode: vi.fn(),
   resetChat: vi.fn(),
   checkAndMaybeReset: vi.fn(),
   incrementDailyCount: vi.fn(),
@@ -58,8 +59,10 @@ import { handleStart, handleMessage, handleUnsupportedMedia } from "../src/bot/h
 function makeCtx(opts: { chatId?: number; text?: string } = {}): Context {
   return {
     chat: { id: opts.chatId ?? 12345 },
+    from: { first_name: "Test" },
     message: { text: opts.text ?? "Me gusta España." },
     reply: vi.fn().mockResolvedValue({}),
+    replyWithSticker: vi.fn().mockResolvedValue({}),
   } as unknown as Context;
 }
 
@@ -126,35 +129,29 @@ describe("formatForTelegram", () => {
 // ── handleStart ──────────────────────────────────────────────────────────────
 
 describe("handleStart", () => {
-  it("resets chat, calls callSolStart, and replies", async () => {
+  it("resets chat, sends sticker, greeting, and main menu", async () => {
     const chat = makeChat({ id: "chat-1", telegramChatId: "12345" });
     vi.mocked(resetChat).mockResolvedValue(chat);
-    vi.mocked(callSolStart).mockResolvedValue(
-      makeSolResponse({ continuation: "¡Hola! ¿De dónde eres?" })
-    );
 
     const ctx = makeCtx();
     await handleStart(ctx);
 
     expect(resetChat).toHaveBeenCalledWith("12345", "supermarket");
-    expect(callSolStart).toHaveBeenCalledOnce();
-    expect(ctx.reply).toHaveBeenCalledOnce();
-  });
-
-  it("sends fallback message when LLM fails", async () => {
-    vi.mocked(resetChat).mockResolvedValue(makeChat());
-    vi.mocked(callSolStart).mockRejectedValue(new SolServiceError("fail"));
-
-    const ctx = makeCtx();
-    await handleStart(ctx);
-
-    expect(ctx.reply).toHaveBeenCalledWith(
-      expect.stringContaining("Sol de Mañana")
-    );
+    expect(callSolStart).not.toHaveBeenCalled();
+    expect(ctx.replyWithSticker).toHaveBeenCalledOnce();
+    expect(ctx.reply).toHaveBeenCalledTimes(2);
+    const firstReplyText = vi.mocked(ctx.reply).mock.calls[0][0] as string;
+    expect(firstReplyText).toContain("Sol");
   });
 
   it("does nothing when chat context is missing", async () => {
-    const ctx = { chat: null, message: null, reply: vi.fn() } as unknown as Context;
+    const ctx = {
+      chat: null,
+      from: null,
+      message: null,
+      reply: vi.fn(),
+      replyWithSticker: vi.fn(),
+    } as unknown as Context;
     await handleStart(ctx);
     expect(ctx.reply).not.toHaveBeenCalled();
   });

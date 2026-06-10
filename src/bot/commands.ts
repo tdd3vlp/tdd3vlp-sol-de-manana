@@ -8,6 +8,7 @@ import {
   handleMoreThemes,
   handleUnsupportedMedia,
   handleTips,
+  handleTipsCallback,
   handleHelp,
   handleSubscribe,
   handleContinueDialogue,
@@ -16,6 +17,9 @@ import {
   handleSuccessfulPayment,
   handleMyId,
   handleSetPlan,
+  handleMainMenuCallback,
+  handleModeDialogueCallback,
+  handleModeTranslationCallback,
 } from "./handlers.js";
 
 export function registerCommands(bot: Bot): void {
@@ -35,4 +39,8 @@ export function registerCommands(bot: Bot): void {
   bot.callbackQuery(/^topic:/, handleTopicCallback);
   bot.callbackQuery("more_themes", handleMoreThemes);
   bot.callbackQuery(/^pay:/, handleDirectPayCallback);
+  bot.callbackQuery("tips", handleTipsCallback);
+  bot.callbackQuery("main_menu", handleMainMenuCallback);
+  bot.callbackQuery("mode_dialogue", handleModeDialogueCallback);
+  bot.callbackQuery("mode_translation", handleModeTranslationCallback);
 }

@@ -42,6 +42,33 @@ function hasNullArtifacts(r: SolResponse): boolean {
   return false;
 }
 
+export async function translateBidirectional(
+  text: string,
+  model: string
+): Promise<{ translation: string; direction: "ru→es" | "es→ru" }> {
+  const cyrillicCount = (text.match(/[а-яёА-ЯЁ]/g) ?? []).length;
+  const latinCount = (text.match(/[a-zA-ZáéíóúüñÁÉÍÓÚÜÑ]/g) ?? []).length;
+  const isRussian = cyrillicCount >= latinCount;
+
+  const systemPrompt = isRussian
+    ? "Переведи текст с русского на испанский (Испания, разговорный стиль). Только перевод, без пояснений."
+    : "Переведи текст с испанского на русский. Только перевод, без пояснений.";
+
+  const response = await openai.chat.completions.create({
+    model,
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: text },
+    ],
+    max_tokens: 600,
+  });
+
+  return {
+    translation: response.choices[0]?.message?.content?.trim() ?? "Перевод недоступен.",
+    direction: isRussian ? "ru→es" : "es→ru",
+  };
+}
+
 export async function translateToRussian(text: string, model: string): Promise<string> {
   const response = await openai.chat.completions.create({
     model,

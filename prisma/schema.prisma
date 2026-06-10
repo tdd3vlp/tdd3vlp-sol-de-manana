@@ -13,6 +13,7 @@ model Chat {
   currentTheme      String
   themeReplyCount   Int       @default(0)
   plan              String    @default("free")
+  mode              String    @default("dialogue")
   dailyMessageCount Int       @default(0)
   dailyResetAt      DateTime  @default(now())
   createdAt         DateTime  @default(now())

@@ -76,6 +76,13 @@ export async function incrementDailyCount(chatId: string): Promise<void> {
   });
 }
 
+export async function updateChatMode(chatId: string, mode: string): Promise<Chat> {
+  return prisma.chat.update({
+    where: { id: chatId },
+    data: { mode },
+  });
+}
+
 export async function upgradeChatPlan(
   telegramChatId: string,
   plan: string
