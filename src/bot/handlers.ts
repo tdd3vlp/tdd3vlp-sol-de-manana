@@ -108,7 +108,7 @@ const TIPS =
   `— Меняйте тему в любой момент и изучайте лексику.`;
 
 const HELP =
-  `Если у вас возникли вопросы или предложения, напишите менеджеру.`;
+  `Если у вас возникли вопросы или предложения, напишите менеджеру.\n\nМенеджер отвечает в течение 24 часов.`;
 
 function meaningful(s: string | null): s is string {
   if (!s) return false;
@@ -406,9 +406,9 @@ export async function handleTipsCallback(ctx: Context): Promise<void> {
 export async function handleHelp(ctx: Context): Promise<void> {
   await ctx.reply(HELP, {
     reply_markup: new InlineKeyboard()
-      .url("Написать менеджеру", "https://t.me/tdd3vlp")
+      .url("Связаться с менеджером", "https://t.me/tdd3vlp")
       .row()
-      .text("Продолжить диалог →", "continue_dialogue"),
+      .text("Главное меню", "main_menu"),
   });
 }
 
