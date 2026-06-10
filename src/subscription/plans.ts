@@ -8,13 +8,17 @@ export const PLAN_LIMITS = {
 
 export type Plan = keyof typeof PLAN_LIMITS;
 
+// Fallbacks repeat the env.ts defaults so partial config mocks in tests
+// cannot produce an undefined model.
 export const PLAN_MODELS: Record<Plan, string> = {
-  free: "gpt-4o-mini",
-  basic: "gpt-4o",
-  premium: "gpt-4o",
+  free: config.openaiModelFree ?? "gpt-4o-mini",
+  basic: config.openaiModelPaid ?? "gpt-4o",
+  premium: config.openaiModelPaid ?? "gpt-4o",
 };
 
-export function getPlanModel(plan: string): string {
+// Admins always get the premium model regardless of their chat's plan.
+export function getPlanModel(plan: string, telegramUserId?: string): string {
+  if (telegramUserId && isAdminUser(telegramUserId)) return PLAN_MODELS.premium;
   return PLAN_MODELS[plan as Plan] ?? PLAN_MODELS.free;
 }
 

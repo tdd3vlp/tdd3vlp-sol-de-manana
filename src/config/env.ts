@@ -11,6 +11,8 @@ function requireEnv(name: string): string {
 export const config = {
   telegramBotToken: requireEnv("TELEGRAM_BOT_TOKEN"),
   openaiApiKey: requireEnv("OPENAI_API_KEY"),
+  openaiModelFree: process.env.OPENAI_MODEL_FREE ?? "gpt-4o-mini",
+  openaiModelPaid: process.env.OPENAI_MODEL_PAID ?? "gpt-4o",
   databaseUrl: requireEnv("DATABASE_URL"),
   nodeEnv: process.env.NODE_ENV ?? "development",
   adminTelegramIds: (process.env.ADMIN_TELEGRAM_IDS ?? "")
