@@ -7,7 +7,7 @@ vi.mock("../src/config/env.js", () => ({
     openaiModel: "gpt-4o",
     databaseUrl: "postgresql://test",
     nodeEnv: "test",
-    webappUrl: "",
+    webAppUrl: "",
     adminTelegramIds: ["999"],
   },
 }));

@@ -9,7 +9,7 @@ vi.mock("../src/config/env.js", () => ({
     openaiModel: "gpt-4o",
     databaseUrl: "postgresql://test",
     nodeEnv: "test",
-    webappUrl: "",
+    webAppUrl: "",
     adminTelegramIds: [],
   },
 }));
@@ -43,7 +43,9 @@ vi.mock("../src/llm/solService.js", () => ({
 
 vi.mock("../src/conversation/themes.js", () => ({
   pickRandomTheme: vi.fn().mockReturnValue("supermarket"),
+  pickRandomThemes: vi.fn().mockReturnValue(["supermarket"]),
   shouldChangeTheme: vi.fn().mockReturnValue(false),
+  THEME_LABELS: { supermarket: "Супермаркет" },
 }));
 
 import type { Context } from "grammy";
