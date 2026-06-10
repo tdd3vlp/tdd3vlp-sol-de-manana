@@ -1,6 +1,7 @@
 import { prisma } from "./prisma.js";
 import type { Chat, Message } from "@prisma/client";
 import { isAdminUser, getPlanLimit, isNewDay } from "../subscription/plans.js";
+import { pickRandomTheme } from "../conversation/themes.js";
 
 export type { Chat, Message };
 
@@ -114,9 +115,18 @@ export async function upgradeChatPlan(
   plan: string,
   expiresAt: Date | null = null
 ): Promise<Chat> {
-  return prisma.chat.update({
+  // Upsert: a deep-link payment can arrive before the user has ever
+  // started a dialogue, so the Chat row may not exist yet.
+  return prisma.chat.upsert({
     where: { telegramChatId },
-    data: { plan, planExpiresAt: expiresAt },
+    update: { plan, planExpiresAt: expiresAt },
+    create: {
+      telegramChatId,
+      currentTheme: pickRandomTheme(),
+      themeReplyCount: 0,
+      plan,
+      planExpiresAt: expiresAt,
+    },
   });
 }
 
