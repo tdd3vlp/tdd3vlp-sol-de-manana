@@ -23,11 +23,10 @@ async function attemptParse(
   const completion = await openai.beta.chat.completions.parse({
     model,
     messages,
-    // The JSON payload carries a 3-sentence continuation plus its Russian
-    // translation (Cyrillic tokenizes at ~2-3 tokens/word) and a correction.
+    // The JSON payload carries a correction plus a 3-sentence continuation.
     // A tight cap truncates the JSON and the whole structured parse fails.
     response_format: zodResponseFormat(SolResponseSchema, "sol_response"),
-    max_tokens: 500,
+    max_tokens: 350,
   });
   const parsed = completion.choices[0]?.message?.parsed;
   if (!parsed) throw new Error("Empty parsed response from OpenAI");
@@ -44,7 +43,6 @@ function hasNullArtifacts(r: SolResponse): boolean {
   const nullLine = /(?:^|\n)\s*:?null[,.]?\s*(?:\n|$)/i;
   if (typeof r.correctionOrTranslation === "string" && nullValue.test(r.correctionOrTranslation)) return true;
   if (nullLine.test(r.continuation)) return true;
-  if (typeof r.russianTranslation === "string" && nullValue.test(r.russianTranslation)) return true;
   return false;
 }
 
@@ -138,7 +136,6 @@ export async function callSol(
       inputLanguage: nonsense ? "nonsense" : "unsupported",
       correctionOrTranslation: null,
       continuation: "Por favor, escribe en español o ruso para que podamos continuar.",
-      russianTranslation: null,
       theme: chat.currentTheme,
     };
   }

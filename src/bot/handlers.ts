@@ -18,6 +18,7 @@ import {
   callSol,
   callSolStart,
   translateBidirectional,
+  translateToRussian,
   SolServiceError,
 } from "../llm/solService.js";
 import { buildLLMContext } from "../conversation/context.js";
@@ -212,6 +213,38 @@ export function formatForTelegram(text: string): string {
     .replace(/\*\*(.+?)\*\*/g, "<b>$1</b>");
 }
 
+// Sends the reply immediately and appends the Russian spoiler afterwards:
+// the translation runs on a cheap model in the background and is edited into
+// the message, so the user never waits for it.
+async function replyWithSpoilerTranslation(
+  ctx: Context,
+  rawText: string,
+  response: SolResponse,
+  plan: string,
+  telegramUserId?: string,
+): Promise<void> {
+  const sent = await ctx.reply(formatForTelegram(rawText), {
+    parse_mode: "HTML",
+    reply_markup: buildDialogueKeyboard(plan, telegramUserId),
+  });
+  if (
+    response.inputLanguage === "unsupported" ||
+    response.inputLanguage === "nonsense"
+  ) {
+    return;
+  }
+  void translateToRussian(response.continuation, config.openaiModelTranslate)
+    .then((translation) =>
+      ctx.api.editMessageText(
+        sent.chat.id,
+        sent.message_id,
+        formatForTelegram(rawText) + buildSpoiler(translation),
+        { parse_mode: "HTML" },
+      ),
+    )
+    .catch((error) => console.error("Spoiler translation failed:", error));
+}
+
 function buildSpoiler(translation: string | null | undefined): string {
   if (!translation) return "";
   const escaped = translation
@@ -278,9 +311,12 @@ async function enterDialogueMode(ctx: Context): Promise<void> {
     );
     const rawText = assembleMessage(response);
     await saveMessage(chat.id, "assistant", rawText, JSON.stringify(response));
-    await ctx.reply(
-      formatForTelegram(rawText) + buildSpoiler(response.russianTranslation),
-      { parse_mode: "HTML", reply_markup: buildDialogueKeyboard(chat.plan, telegramUserId) },
+    await replyWithSpoilerTranslation(
+      ctx,
+      rawText,
+      response,
+      chat.plan,
+      telegramUserId,
     );
   } catch (error) {
     console.error("enterDialogueMode error:", error);
@@ -455,9 +491,12 @@ async function handleCustomTopicInput(
     );
     const rawText = assembleMessage(response);
     await saveMessage(chat.id, "assistant", rawText, JSON.stringify(response));
-    await ctx.reply(
-      formatForTelegram(rawText) + buildSpoiler(response.russianTranslation),
-      { parse_mode: "HTML", reply_markup: buildDialogueKeyboard(chat.plan, telegramUserId) },
+    await replyWithSpoilerTranslation(
+      ctx,
+      rawText,
+      response,
+      chat.plan,
+      telegramUserId,
     );
   } catch (error) {
     console.error("handleCustomTopicInput error:", error);
@@ -519,9 +558,12 @@ export async function handleTopicCallback(ctx: Context): Promise<void> {
     );
     const rawText = assembleMessage(response);
     await saveMessage(chat.id, "assistant", rawText, JSON.stringify(response));
-    await ctx.reply(
-      formatForTelegram(rawText) + buildSpoiler(response.russianTranslation),
-      { parse_mode: "HTML", reply_markup: buildDialogueKeyboard(chat.plan, telegramUserId) },
+    await replyWithSpoilerTranslation(
+      ctx,
+      rawText,
+      response,
+      chat.plan,
+      telegramUserId,
     );
   } catch (error) {
     console.error("handleTopicCallback error:", error);
@@ -633,9 +675,12 @@ export async function handleMessage(ctx: Context): Promise<void> {
 
     const rawText = assembleMessage(response, userText);
     await saveMessage(chat.id, "assistant", rawText, JSON.stringify(response));
-    await ctx.reply(
-      formatForTelegram(rawText) + buildSpoiler(response.russianTranslation),
-      { parse_mode: "HTML", reply_markup: buildDialogueKeyboard(chat.plan, telegramUserId) },
+    await replyWithSpoilerTranslation(
+      ctx,
+      rawText,
+      response,
+      chat.plan,
+      telegramUserId,
     );
   } catch (error) {
     if (consumed) await refundDailyMessage(chat.id);

@@ -13,6 +13,7 @@ export const config = {
   openaiApiKey: requireEnv("OPENAI_API_KEY"),
   openaiModelFree: process.env.OPENAI_MODEL_FREE ?? "gpt-4o-mini",
   openaiModelPaid: process.env.OPENAI_MODEL_PAID ?? "gpt-4o",
+  openaiModelTranslate: process.env.OPENAI_MODEL_TRANSLATE ?? "gpt-4o-mini",
   databaseUrl: requireEnv("DATABASE_URL"),
   nodeEnv: process.env.NODE_ENV ?? "development",
   adminTelegramIds: (process.env.ADMIN_TELEGRAM_IDS ?? "")

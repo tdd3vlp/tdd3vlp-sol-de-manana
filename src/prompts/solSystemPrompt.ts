@@ -29,7 +29,6 @@ Respond in JSON with exactly these fields:
 - inputLanguage: "spanish"
 - correctionOrTranslation: null
 - continuation: your dialogue and question
-- russianTranslation: Russian translation of the continuation text
 - theme: "${safeTheme}"`;
 }
 
@@ -121,7 +120,6 @@ Short Spanish words without diacritics (no, sí, vale, bien, claro, bueno, hola,
 - inputLanguage: one of "spanish", "russian", "mixed", "unsupported", "nonsense"
 - correctionOrTranslation: string or null — ALWAYS plain text, never markdown
 - continuation: string — always ends with exactly one question (except for unsupported/nonsense)
-- russianTranslation: Russian translation of the continuation text only. Null when inputLanguage is "unsupported" or "nonsense".
 - theme: "${safeTheme}"
 
 ## Conversation Style

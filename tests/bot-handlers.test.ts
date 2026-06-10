@@ -6,7 +6,9 @@ vi.mock("../src/config/env.js", () => ({
   config: {
     telegramBotToken: "test-token",
     openaiApiKey: "test-key",
-    openaiModel: "gpt-4o",
+    openaiModelFree: "gpt-4o-mini",
+    openaiModelPaid: "gpt-4o",
+    openaiModelTranslate: "gpt-4o-mini",
     databaseUrl: "postgresql://test",
     nodeEnv: "test",
     webAppUrl: "",
@@ -33,6 +35,11 @@ vi.mock("../src/db/payments.js", () => ({
 vi.mock("../src/llm/solService.js", () => ({
   callSol: vi.fn(),
   callSolStart: vi.fn(),
+  translateBidirectional: vi.fn(async () => ({
+    translation: "перевод",
+    direction: "es→ru" as const,
+  })),
+  translateToRussian: vi.fn(async () => "перевод"),
   SolServiceError: class SolServiceError extends Error {
     constructor(msg: string) {
       super(msg);
@@ -58,7 +65,12 @@ import {
   consumeDailyMessage,
   refundDailyMessage,
 } from "../src/db/chatHistory.js";
-import { callSol, callSolStart, SolServiceError } from "../src/llm/solService.js";
+import {
+  callSol,
+  callSolStart,
+  translateToRussian,
+  SolServiceError,
+} from "../src/llm/solService.js";
 import { shouldChangeTheme } from "../src/conversation/themes.js";
 import {
   handleStart,
@@ -74,8 +86,12 @@ function makeCtx(opts: { chatId?: number; text?: string } = {}): Context {
     chat: { id: opts.chatId ?? 12345 },
     from: { first_name: "Test" },
     message: { text: opts.text ?? "Me gusta España." },
-    reply: vi.fn().mockResolvedValue({}),
+    reply: vi.fn().mockResolvedValue({
+      chat: { id: opts.chatId ?? 12345 },
+      message_id: 1,
+    }),
     replyWithSticker: vi.fn().mockResolvedValue({}),
+    api: { editMessageText: vi.fn().mockResolvedValue(true) },
   } as unknown as Context;
 }
 
@@ -342,6 +358,29 @@ describe("handleMessage", () => {
       expect.any(String)
     );
     expect(ctx.reply).toHaveBeenCalledOnce();
+  });
+
+  it("edits the russian spoiler into the reply in the background", async () => {
+    const chat = makeChat();
+    vi.mocked(getOrCreateChat).mockResolvedValue(chat);
+    vi.mocked(updateChatTheme).mockResolvedValue({ ...chat, themeReplyCount: 1 });
+    vi.mocked(callSol).mockResolvedValue(
+      makeSolResponse({ continuation: "Interesante. ¿Y tú?" })
+    );
+
+    const ctx = makeCtx({ text: "Me gusta España." });
+    await handleMessage(ctx);
+
+    await vi.waitFor(() =>
+      expect(ctx.api.editMessageText).toHaveBeenCalledOnce()
+    );
+    expect(translateToRussian).toHaveBeenCalledWith(
+      "Interesante. ¿Y tú?",
+      "gpt-4o-mini"
+    );
+    const edited = vi.mocked(ctx.api.editMessageText).mock.calls[0][2] as string;
+    expect(edited).toContain("tg-spoiler");
+    expect(edited).toContain("перевод");
   });
 
   it("increments themeReplyCount when theme does not change", async () => {

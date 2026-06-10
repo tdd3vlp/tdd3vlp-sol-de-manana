@@ -6,7 +6,6 @@ export function makeSolResponse(overrides: Partial<SolResponse> = {}): SolRespon
     inputLanguage: "spanish",
     correctionOrTranslation: null,
     continuation: "Buenas. ¿En qué puedo ayudarte hoy?",
-    russianTranslation: null,
     theme: "moving to Spain",
     ...overrides,
   };
