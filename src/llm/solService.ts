@@ -4,9 +4,10 @@ import { openai } from "./openaiClient.js";
 import { SolResponseSchema, type SolResponse } from "./schemas.js";
 import { buildSystemPrompt, buildStartSystemPrompt } from "../prompts/solSystemPrompt.js";
 import { config } from "../config/env.js";
+import { getPlanModel } from "../subscription/plans.js";
 import type { Chat } from "@prisma/client";
 import type { LLMMessage } from "../conversation/context.js";
-import { isNonsense } from "../conversation/language.js";
+import { isNonsense, isLikelyUnsupported } from "../conversation/language.js";
 
 export class SolServiceError extends Error {
   constructor(message: string) {
@@ -16,12 +17,14 @@ export class SolServiceError extends Error {
 }
 
 async function attemptParse(
-  messages: ChatCompletionMessageParam[]
+  messages: ChatCompletionMessageParam[],
+  model: string
 ): Promise<SolResponse> {
   const completion = await openai.beta.chat.completions.parse({
-    model: config.openaiModel,
+    model,
     messages,
     response_format: zodResponseFormat(SolResponseSchema, "sol_response"),
+    max_tokens: 150,
   });
   const parsed = completion.choices[0]?.message?.parsed;
   if (!parsed) throw new Error("Empty parsed response from OpenAI");
@@ -37,12 +40,39 @@ function hasNullArtifacts(r: SolResponse): boolean {
   const nullLine = /(?:^|\n)\s*:?null[,.]?\s*(?:\n|$)/i;
   if (typeof r.correctionOrTranslation === "string" && nullValue.test(r.correctionOrTranslation)) return true;
   if (nullLine.test(r.continuation)) return true;
+  if (typeof r.russianTranslation === "string" && nullValue.test(r.russianTranslation)) return true;
   return false;
 }
 
-export async function translateToRussian(text: string): Promise<string> {
+export async function translateBidirectional(
+  text: string,
+  model: string
+): Promise<{ translation: string; direction: "ru→es" | "es→ru" }> {
+  const cyrillicCount = (text.match(/[а-яёА-ЯЁ]/g) ?? []).length;
+  const latinCount = (text.match(/[a-zA-ZáéíóúüñÁÉÍÓÚÜÑ]/g) ?? []).length;
+  const isRussian = cyrillicCount >= latinCount;
+
+  const systemPrompt = isRussian
+    ? "Переведи текст с русского на испанский (Испания, разговорный стиль). Только перевод, без пояснений."
+    : "Переведи текст с испанского на русский. Только перевод, без пояснений.";
+
   const response = await openai.chat.completions.create({
-    model: config.openaiModel,
+    model,
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: text },
+    ],
+  });
+
+  return {
+    translation: response.choices[0]?.message?.content?.trim() ?? "Перевод недоступен.",
+    direction: isRussian ? "ru→es" : "es→ru",
+  };
+}
+
+export async function translateToRussian(text: string, model: string): Promise<string> {
+  const response = await openai.chat.completions.create({
+    model,
     messages: [
       {
         role: "system",
@@ -59,6 +89,7 @@ export async function translateToRussian(text: string): Promise<string> {
 }
 
 export async function callSolStart(chat: Chat): Promise<SolResponse> {
+  const model = getPlanModel(chat.plan);
   const messages: ChatCompletionMessageParam[] = [
     { role: "system", content: buildStartSystemPrompt(chat.currentTheme) },
     { role: "user", content: "hola" },
@@ -70,7 +101,7 @@ export async function callSolStart(chat: Chat): Promise<SolResponse> {
   });
 
   try {
-    return sanitize(await attemptParse(messages));
+    return sanitize(await attemptParse(messages, model));
   } catch (firstError) {
     console.warn("Start LLM call failed, retrying:", firstError);
     try {
@@ -81,7 +112,7 @@ export async function callSolStart(chat: Chat): Promise<SolResponse> {
           content:
             "Your previous response was invalid. Please respond with valid JSON matching the required schema.",
         },
-      ]));
+      ], model));
     } catch (retryError) {
       console.error("Start LLM service failed after retry:", retryError);
       throw new SolServiceError("Failed to get a valid start response from the language model");
@@ -94,15 +125,18 @@ export async function callSol(
   history: LLMMessage[],
   chat: Chat
 ): Promise<SolResponse> {
-  if (isNonsense(userText)) {
+  const nonsense = isNonsense(userText);
+  if (nonsense || isLikelyUnsupported(userText)) {
     return {
-      inputLanguage: "nonsense",
+      inputLanguage: nonsense ? "nonsense" : "unsupported",
       correctionOrTranslation: null,
       continuation: "Por favor, escribe en español o ruso para que podamos continuar.",
+      russianTranslation: null,
       theme: chat.currentTheme,
     };
   }
 
+  const model = getPlanModel(chat.plan);
   const baseMessages: ChatCompletionMessageParam[] = [
     { role: "system", content: buildSystemPrompt(chat.currentTheme) },
     ...history.map((m) => ({ role: m.role, content: m.content })),
@@ -110,7 +144,7 @@ export async function callSol(
   ];
 
   try {
-    const first = await attemptParse(baseMessages);
+    const first = await attemptParse(baseMessages, model);
     if (hasNullArtifacts(first)) throw new Error("Semantic validation: null artifacts in response");
     return first;
   } catch (firstError) {
@@ -124,7 +158,7 @@ export async function callSol(
             "Your previous response was invalid. Please respond again with valid JSON that strictly matches the required schema.",
         },
       ];
-      const retry = await attemptParse(repairMessages);
+      const retry = await attemptParse(repairMessages, model);
       if (hasNullArtifacts(retry)) throw new Error("Semantic validation: null artifacts in retry response");
       return retry;
     } catch (retryError) {

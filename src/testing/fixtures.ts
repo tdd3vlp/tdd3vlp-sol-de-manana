@@ -6,6 +6,7 @@ export function makeSolResponse(overrides: Partial<SolResponse> = {}): SolRespon
     inputLanguage: "spanish",
     correctionOrTranslation: null,
     continuation: "Buenas. ¿En qué puedo ayudarte hoy?",
+    russianTranslation: null,
     theme: "moving to Spain",
     ...overrides,
   };
@@ -17,6 +18,10 @@ export function makeChat(overrides: Partial<Chat> = {}): Chat {
     telegramChatId: "123456",
     currentTheme: "moving to Spain",
     themeReplyCount: 0,
+    plan: "free",
+    mode: "dialogue",
+    dailyMessageCount: 0,
+    dailyResetAt: new Date(),
     createdAt: new Date(),
     updatedAt: new Date(),
     ...overrides,

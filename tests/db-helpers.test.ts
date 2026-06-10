@@ -30,6 +30,10 @@ const mockChat = {
   telegramChatId: "123",
   currentTheme: "supermarket",
   themeReplyCount: 3,
+  plan: "free",
+  mode: "dialogue",
+  dailyMessageCount: 0,
+  dailyResetAt: new Date(),
   createdAt: new Date(),
   updatedAt: new Date(),
 };

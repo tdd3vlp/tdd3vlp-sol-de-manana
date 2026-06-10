@@ -12,6 +12,7 @@ bot.catch((err) => {
 
 bot.api.setMyCommands([
   { command: "start", description: "Начать или перезапустить сессию" },
+  { command: "subscribe", description: "Управление подпиской" },
   { command: "tips", description: "Советы по работе с ботом" },
   { command: "help", description: "Связаться с менеджером" },
 ]);

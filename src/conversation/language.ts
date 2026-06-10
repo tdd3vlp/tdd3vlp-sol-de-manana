@@ -14,3 +14,27 @@ function isWordLike(token: string): boolean {
 export function isNonsense(text: string): boolean {
   return !text.trim().split(/\s+/).some(isWordLike);
 }
+
+// English function words that never appear as meaningful Spanish words.
+// Presence of any one of these (with no Cyrillic or Spanish diacritics) strongly
+// signals English or another unsupported Latin-script language.
+const ENGLISH_MARKERS = new Set([
+  "the", "is", "are", "was", "were", "have", "has", "been",
+  "will", "would", "could", "should", "this", "that", "these",
+  "those", "what", "where", "when", "why", "how", "can",
+  "my", "your", "our", "their", "and", "but", "not", "with",
+  "dont", "wont", "cant", "im", "its", "youre",
+]);
+
+const CYRILLIC_RE = /[А-Яа-яЁё]/;
+const SPANISH_DIACRITIC_RE = /[áéíóúüñÁÉÍÓÚÜÑ¿¡]/;
+
+// Returns true when the text is likely English or another unsupported language,
+// detected locally without calling the LLM. Does not fire on Russian (Cyrillic)
+// or Spanish that uses any diacritic characters.
+export function isLikelyUnsupported(text: string): boolean {
+  if (CYRILLIC_RE.test(text)) return false;
+  if (SPANISH_DIACRITIC_RE.test(text)) return false;
+  const words = text.toLowerCase().match(/[a-z]+/g) ?? [];
+  return words.some((w) => ENGLISH_MARKERS.has(w));
+}
