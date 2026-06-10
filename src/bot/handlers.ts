@@ -362,6 +362,12 @@ async function handleTranslationInput(
     return;
   }
 
+  // The translator only handles Spanish and Russian
+  if (isNonsense(userText) || isLikelyUnsupported(userText)) {
+    await ctx.reply(UNSUPPORTED_WARNING);
+    return;
+  }
+
   const { allowed, consumed, chat: freshChat } = await consumeDailyMessage(
     chat,
     telegramUserId,
@@ -441,6 +447,11 @@ async function handleCustomTopicInput(
 ): Promise<void> {
   if (userText.length > 200) {
     await ctx.reply("Тема слишком длинная. Напиши покороче — одним предложением.");
+    return;
+  }
+
+  if (isNonsense(userText)) {
+    await ctx.reply("Не понял тему. Напиши её на русском или испанском.");
     return;
   }
 
@@ -586,6 +597,20 @@ export async function handleMessage(ctx: Context): Promise<void> {
     return;
   }
 
+  let chat = await getOrCreateChat(telegramChatId, pickRandomTheme());
+
+  // Mode-specific input is routed before dialogue checks: translation allows
+  // longer text (500) and custom topics may contain English words.
+  if (chat.mode === "translation") {
+    await handleTranslationInput(ctx, userText);
+    return;
+  }
+
+  if (chat.mode === "awaiting_custom_topic") {
+    await handleCustomTopicInput(ctx, userText, chat, telegramUserId);
+    return;
+  }
+
   if (userText.length > 350) {
     await ctx.reply(
       "Сообщение слишком длинное. Пожалуйста, напиши не более 3–4 предложений.",
@@ -596,20 +621,6 @@ export async function handleMessage(ctx: Context): Promise<void> {
   // Nonsense/unsupported: warn without touching the counter
   if (isNonsense(userText) || isLikelyUnsupported(userText)) {
     await ctx.reply(UNSUPPORTED_WARNING);
-    return;
-  }
-
-  let chat = await getOrCreateChat(telegramChatId, pickRandomTheme());
-
-  // Route to translation mode if active
-  if (chat.mode === "translation") {
-    await handleTranslationInput(ctx, userText);
-    return;
-  }
-
-  // Handle custom topic input
-  if (chat.mode === "awaiting_custom_topic") {
-    await handleCustomTopicInput(ctx, userText, chat, telegramUserId);
     return;
   }
 
