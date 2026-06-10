@@ -14,7 +14,7 @@ vi.mock("../src/config/env.js", () => ({
 
 vi.mock("../src/db/prisma.js", () => ({
   prisma: {
-    chat: { update: vi.fn() },
+    chat: { update: vi.fn(), updateMany: vi.fn() },
   },
 }));
 
@@ -26,10 +26,14 @@ import {
   getTodayStartUTC3,
   isNewDay,
 } from "../src/subscription/plans.js";
-import { checkAndMaybeReset, incrementDailyCount } from "../src/db/chatHistory.js";
+import { consumeDailyMessage, refundDailyMessage } from "../src/db/chatHistory.js";
 import { makeChat } from "../src/testing/fixtures.js";
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+  vi.clearAllMocks();
+  // Default: the conditional increment succeeds (under the limit)
+  vi.mocked(prisma.chat.updateMany).mockResolvedValue({ count: 1 });
+});
 
 // ── Plan limits ───────────────────────────────────────────────────────────────
 
@@ -98,32 +102,49 @@ describe("isNewDay", () => {
   });
 });
 
-// ── checkAndMaybeReset ────────────────────────────────────────────────────────
+// ── consumeDailyMessage ───────────────────────────────────────────────────────
 
-describe("checkAndMaybeReset", () => {
-  it("allows message when count is below limit", async () => {
+describe("consumeDailyMessage", () => {
+  it("consumes atomically with a conditional increment under the plan limit", async () => {
     const chat = makeChat({ plan: "free", dailyMessageCount: 5, dailyResetAt: new Date() });
-    const result = await checkAndMaybeReset(chat, "12345");
+    const result = await consumeDailyMessage(chat, "12345");
+
+    expect(prisma.chat.updateMany).toHaveBeenCalledWith({
+      where: { id: chat.id, dailyMessageCount: { lt: 10 } },
+      data: { dailyMessageCount: { increment: 1 } },
+    });
     expect(result.allowed).toBe(true);
+    expect(result.consumed).toBe(true);
+    expect(result.chat.dailyMessageCount).toBe(6);
   });
 
-  it("blocks message when count equals limit", async () => {
+  it("blocks when the conditional increment matches no row (limit reached)", async () => {
+    vi.mocked(prisma.chat.updateMany).mockResolvedValue({ count: 0 });
     const chat = makeChat({ plan: "free", dailyMessageCount: 10, dailyResetAt: new Date() });
-    const result = await checkAndMaybeReset(chat, "12345");
+
+    const result = await consumeDailyMessage(chat, "12345");
+
     expect(result.allowed).toBe(false);
+    expect(result.consumed).toBe(false);
   });
 
-  it("blocks at 101 for basic plan", async () => {
-    const chat = makeChat({ plan: "basic", dailyMessageCount: 100, dailyResetAt: new Date() });
-    const result = await checkAndMaybeReset(chat, "12345");
-    expect(result.allowed).toBe(false);
+  it("uses the basic plan limit in the increment condition", async () => {
+    const chat = makeChat({ plan: "basic", dailyMessageCount: 50, dailyResetAt: new Date() });
+    await consumeDailyMessage(chat, "12345");
+    expect(prisma.chat.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ dailyMessageCount: { lt: 100 } }),
+      })
+    );
   });
 
-  it("allows admin user even when over limit", async () => {
+  it("allows admin user without touching the counter", async () => {
     const chat = makeChat({ plan: "free", dailyMessageCount: 999, dailyResetAt: new Date() });
-    const result = await checkAndMaybeReset(chat, "999");
+    const result = await consumeDailyMessage(chat, "999");
     expect(result.allowed).toBe(true);
+    expect(result.consumed).toBe(false);
     expect(prisma.chat.update).not.toHaveBeenCalled();
+    expect(prisma.chat.updateMany).not.toHaveBeenCalled();
   });
 
   it("resets counter when resetAt is from a previous day", async () => {
@@ -135,7 +156,7 @@ describe("checkAndMaybeReset", () => {
       dailyResetAt: new Date(),
     });
 
-    const result = await checkAndMaybeReset(chat, "12345");
+    const result = await consumeDailyMessage(chat, "12345");
 
     expect(prisma.chat.update).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -143,12 +164,12 @@ describe("checkAndMaybeReset", () => {
       })
     );
     expect(result.allowed).toBe(true);
-    expect(result.chat.dailyMessageCount).toBe(0);
+    expect(result.chat.dailyMessageCount).toBe(1);
   });
 
   it("does not reset when resetAt is today", async () => {
     const chat = makeChat({ plan: "free", dailyMessageCount: 3, dailyResetAt: new Date() });
-    await checkAndMaybeReset(chat, "12345");
+    await consumeDailyMessage(chat, "12345");
     expect(prisma.chat.update).not.toHaveBeenCalled();
   });
 
@@ -165,14 +186,20 @@ describe("checkAndMaybeReset", () => {
       plan: "free",
       planExpiresAt: null,
     });
+    // 50 messages is over the free limit of 10 → conditional update matches nothing
+    vi.mocked(prisma.chat.updateMany).mockResolvedValue({ count: 0 });
 
-    const result = await checkAndMaybeReset(chat, "12345");
+    const result = await consumeDailyMessage(chat, "12345");
 
     expect(prisma.chat.update).toHaveBeenCalledWith({
       where: { id: chat.id },
       data: { plan: "free", planExpiresAt: null },
     });
-    // 50 messages is over the free limit of 10
+    expect(prisma.chat.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ dailyMessageCount: { lt: 10 } }),
+      })
+    );
     expect(result.allowed).toBe(false);
     expect(result.chat.plan).toBe("free");
   });
@@ -186,7 +213,7 @@ describe("checkAndMaybeReset", () => {
       dailyResetAt: new Date(),
     });
 
-    const result = await checkAndMaybeReset(chat, "12345");
+    const result = await consumeDailyMessage(chat, "12345");
 
     expect(prisma.chat.update).not.toHaveBeenCalled();
     expect(result.allowed).toBe(true);
@@ -200,22 +227,21 @@ describe("checkAndMaybeReset", () => {
       dailyResetAt: new Date(),
     });
 
-    const result = await checkAndMaybeReset(chat, "12345");
+    const result = await consumeDailyMessage(chat, "12345");
 
     expect(prisma.chat.update).not.toHaveBeenCalled();
     expect(result.allowed).toBe(true);
   });
 });
 
-// ── incrementDailyCount ───────────────────────────────────────────────────────
+// ── refundDailyMessage ────────────────────────────────────────────────────────
 
-describe("incrementDailyCount", () => {
-  it("calls prisma.chat.update with increment: 1", async () => {
-    vi.mocked(prisma.chat.update).mockResolvedValue(makeChat());
-    await incrementDailyCount("chat-1");
-    expect(prisma.chat.update).toHaveBeenCalledWith({
-      where: { id: "chat-1" },
-      data: { dailyMessageCount: { increment: 1 } },
+describe("refundDailyMessage", () => {
+  it("decrements the counter only when it is above zero", async () => {
+    await refundDailyMessage("chat-1");
+    expect(prisma.chat.updateMany).toHaveBeenCalledWith({
+      where: { id: "chat-1", dailyMessageCount: { gt: 0 } },
+      data: { dailyMessageCount: { decrement: 1 } },
     });
   });
 });

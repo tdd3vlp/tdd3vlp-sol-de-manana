@@ -50,12 +50,19 @@ export async function updateChatTheme(
   });
 }
 
-export async function checkAndMaybeReset(
+export interface ConsumeResult {
+  allowed: boolean;
+  // True when this call actually incremented the counter (admins never consume).
+  consumed: boolean;
+  chat: Chat;
+}
+
+export async function consumeDailyMessage(
   chat: Chat,
   telegramUserId: string | undefined
-): Promise<{ allowed: boolean; chat: Chat }> {
+): Promise<ConsumeResult> {
   if (telegramUserId && isAdminUser(telegramUserId)) {
-    return { allowed: true, chat };
+    return { allowed: true, consumed: false, chat };
   }
 
   let current = chat;
@@ -80,14 +87,29 @@ export async function checkAndMaybeReset(
     });
   }
 
+  // Atomic check-and-increment: the row is updated only while under the
+  // limit, so concurrent updates cannot push the counter past it.
   const limit = getPlanLimit(current.plan);
-  return { allowed: current.dailyMessageCount < limit, chat: current };
+  const result = await prisma.chat.updateMany({
+    where: { id: current.id, dailyMessageCount: { lt: limit } },
+    data: { dailyMessageCount: { increment: 1 } },
+  });
+  if (result.count === 0) {
+    return { allowed: false, consumed: false, chat: current };
+  }
+  return {
+    allowed: true,
+    consumed: true,
+    chat: { ...current, dailyMessageCount: current.dailyMessageCount + 1 },
+  };
 }
 
-export async function incrementDailyCount(chatId: string): Promise<void> {
-  await prisma.chat.update({
-    where: { id: chatId },
-    data: { dailyMessageCount: { increment: 1 } },
+// Gives the message back when the LLM call failed or the input turned out
+// to be unsupported — the user should not pay the limit for it.
+export async function refundDailyMessage(chatId: string): Promise<void> {
+  await prisma.chat.updateMany({
+    where: { id: chatId, dailyMessageCount: { gt: 0 } },
+    data: { dailyMessageCount: { decrement: 1 } },
   });
 }
 

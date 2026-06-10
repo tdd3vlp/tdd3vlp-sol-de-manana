@@ -9,8 +9,8 @@ import {
   updateChatThemeAndLock,
   updateChatMode,
   resetChat,
-  checkAndMaybeReset,
-  incrementDailyCount,
+  consumeDailyMessage,
+  refundDailyMessage,
   upgradeChatPlan,
 } from "../db/chatHistory.js";
 import { recordPaymentOnce } from "../db/payments.js";
@@ -270,7 +270,7 @@ async function enterDialogueMode(ctx: Context): Promise<void> {
   let chat = await getOrCreateChat(telegramChatId, pickRandomTheme());
   await updateChatMode(chat.id, "dialogue");
 
-  const { allowed, chat: freshChat } = await checkAndMaybeReset(
+  const { allowed, consumed, chat: freshChat } = await consumeDailyMessage(
     chat,
     telegramUserId,
   );
@@ -282,7 +282,6 @@ async function enterDialogueMode(ctx: Context): Promise<void> {
 
   try {
     const response = await callSolStart(chat);
-    await incrementDailyCount(chat.id);
     const rawText = assembleMessage(response);
     await saveMessage(chat.id, "assistant", rawText, JSON.stringify(response));
     await ctx.reply(
@@ -291,6 +290,7 @@ async function enterDialogueMode(ctx: Context): Promise<void> {
     );
   } catch (error) {
     console.error("enterDialogueMode error:", error);
+    if (consumed) await refundDailyMessage(chat.id);
     await ctx.reply(
       "Lo siento, ocurrió un error. Por favor, inténtalo de nuevo.",
     );
@@ -355,7 +355,14 @@ async function handleTranslationInput(
     return;
   }
 
-  const { allowed, chat: freshChat } = await checkAndMaybeReset(
+  if (userText.length > 500) {
+    await ctx.reply(
+      "Текст слишком длинный. Пожалуйста, отправь не более 3–4 предложений.",
+    );
+    return;
+  }
+
+  const { allowed, consumed, chat: freshChat } = await consumeDailyMessage(
     chat,
     telegramUserId,
   );
@@ -365,26 +372,19 @@ async function handleTranslationInput(
     return;
   }
 
-  if (userText.length > 500) {
-    await ctx.reply(
-      "Текст слишком длинный. Пожалуйста, отправь не более 3–4 предложений.",
-    );
-    return;
-  }
-
   const model = getPlanModel(chat.plan);
   try {
     const { translation, direction } = await translateBidirectional(
       userText,
       model,
     );
-    await incrementDailyCount(chat.id);
     const label = direction === "ru→es" ? "🇪🇸 Испанский:" : "🇷🇺 Русский:";
     await ctx.reply(`${label}\n\n${translation}`, {
       reply_markup: translationReplyKeyboard,
     });
   } catch (error) {
     console.error("Translation error:", error);
+    if (consumed) await refundDailyMessage(chat.id);
     await ctx.reply("Не удалось перевести. Попробуй ещё раз.");
   }
 }
@@ -444,7 +444,7 @@ async function handleCustomTopicInput(
     return;
   }
 
-  const { allowed, chat: freshChat } = await checkAndMaybeReset(chat, telegramUserId);
+  const { allowed, consumed, chat: freshChat } = await consumeDailyMessage(chat, telegramUserId);
   if (!allowed) {
     await sendPaywall(ctx, chat.plan);
     return;
@@ -456,7 +456,6 @@ async function handleCustomTopicInput(
 
   try {
     const response = await callSolStart(chat);
-    await incrementDailyCount(chat.id);
     const rawText = assembleMessage(response);
     await saveMessage(chat.id, "assistant", rawText, JSON.stringify(response));
     await ctx.reply(
@@ -465,6 +464,7 @@ async function handleCustomTopicInput(
     );
   } catch (error) {
     console.error("handleCustomTopicInput error:", error);
+    if (consumed) await refundDailyMessage(chat.id);
     await ctx.reply("Lo siento, ocurrió un error. Por favor, inténtalo de nuevo.");
   }
 }
@@ -502,7 +502,7 @@ export async function handleTopicCallback(ctx: Context): Promise<void> {
   chat = await updateChatThemeAndLock(chat.id, theme, 0, false);
   await updateChatMode(chat.id, "dialogue");
 
-  const { allowed, chat: freshChat } = await checkAndMaybeReset(
+  const { allowed, consumed, chat: freshChat } = await consumeDailyMessage(
     chat,
     telegramUserId,
   );
@@ -514,7 +514,6 @@ export async function handleTopicCallback(ctx: Context): Promise<void> {
 
   try {
     const response = await callSolStart(chat);
-    await incrementDailyCount(chat.id);
     const rawText = assembleMessage(response);
     await saveMessage(chat.id, "assistant", rawText, JSON.stringify(response));
     await ctx.reply(
@@ -523,6 +522,7 @@ export async function handleTopicCallback(ctx: Context): Promise<void> {
     );
   } catch (error) {
     console.error("handleTopicCallback error:", error);
+    if (consumed) await refundDailyMessage(chat.id);
     await ctx.reply(
       "Lo siento, ocurrió un error. Por favor, inténtalo de nuevo.",
     );
@@ -614,7 +614,7 @@ export async function handleMessage(ctx: Context): Promise<void> {
   }
 
   // Dialogue mode flow
-  const { allowed, chat: freshChat } = await checkAndMaybeReset(
+  const { allowed, consumed, chat: freshChat } = await consumeDailyMessage(
     chat,
     telegramUserId,
   );
@@ -635,11 +635,13 @@ export async function handleMessage(ctx: Context): Promise<void> {
     // the next request gets a broken context.
     await saveMessage(chat.id, "user", userText);
 
+    // Unsupported/nonsense input does not count against the daily limit
     if (
-      response.inputLanguage !== "unsupported" &&
-      response.inputLanguage !== "nonsense"
+      consumed &&
+      (response.inputLanguage === "unsupported" ||
+        response.inputLanguage === "nonsense")
     ) {
-      await incrementDailyCount(chat.id);
+      await refundDailyMessage(chat.id);
     }
 
     let newCount = chat.themeReplyCount + 1;
@@ -659,6 +661,7 @@ export async function handleMessage(ctx: Context): Promise<void> {
       { parse_mode: "HTML", reply_markup: buildDialogueKeyboard(chat.plan, telegramUserId) },
     );
   } catch (error) {
+    if (consumed) await refundDailyMessage(chat.id);
     if (error instanceof SolServiceError) {
       console.error("LLM service error in handleMessage:", error);
       await ctx.reply(

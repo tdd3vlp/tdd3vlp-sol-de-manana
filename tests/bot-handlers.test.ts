@@ -21,8 +21,8 @@ vi.mock("../src/db/chatHistory.js", () => ({
   updateChatTheme: vi.fn(),
   updateChatMode: vi.fn(),
   resetChat: vi.fn(),
-  checkAndMaybeReset: vi.fn(),
-  incrementDailyCount: vi.fn(),
+  consumeDailyMessage: vi.fn(),
+  refundDailyMessage: vi.fn(),
   upgradeChatPlan: vi.fn(),
 }));
 
@@ -53,8 +53,8 @@ import {
   getRecentMessages,
   updateChatTheme,
   resetChat,
-  checkAndMaybeReset,
-  incrementDailyCount,
+  consumeDailyMessage,
+  refundDailyMessage,
 } from "../src/db/chatHistory.js";
 import { callSol, callSolStart, SolServiceError } from "../src/llm/solService.js";
 import { shouldChangeTheme } from "../src/conversation/themes.js";
@@ -81,9 +81,13 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(saveMessage).mockResolvedValue({} as ReturnType<typeof saveMessage> extends Promise<infer T> ? T : never);
   vi.mocked(getRecentMessages).mockResolvedValue([]);
-  vi.mocked(incrementDailyCount).mockResolvedValue();
-  // Default: limit not exceeded, return chat unchanged
-  vi.mocked(checkAndMaybeReset).mockImplementation(async (chat) => ({ allowed: true, chat }));
+  vi.mocked(refundDailyMessage).mockResolvedValue();
+  // Default: limit not exceeded, message consumed, return chat unchanged
+  vi.mocked(consumeDailyMessage).mockImplementation(async (chat) => ({
+    allowed: true,
+    consumed: true,
+    chat,
+  }));
   vi.mocked(recordPaymentOnce).mockResolvedValue(true);
 });
 
@@ -375,6 +379,8 @@ describe("handleMessage", () => {
     );
     // No orphan user message must remain in history after an LLM failure
     expect(saveMessage).not.toHaveBeenCalled();
+    // The failed message must be refunded to the daily limit
+    expect(refundDailyMessage).toHaveBeenCalled();
   });
 
   it("does nothing when message text is missing", async () => {
