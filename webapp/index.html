@@ -433,22 +433,23 @@
           return;
         }
         // Fallback for old clients: /start deep link → bot sends the invoice.
-        const payLink = "https://t.me/soldemanana_bot?start=pay_" + plan;
-        if (tg) {
-          tg.openTelegramLink(payLink);
-        } else {
-          window.open(payLink, "_blank");
-        }
+        openTgLink("https://t.me/soldemanana_bot?start=pay_" + plan);
       });
     });
 
+    // The native macOS client ignores openTelegramLink (known client bug),
+    // but intercepts a plain t.me navigation just fine.
+    function openTgLink(url) {
+      if (tg && tg.platform !== "macos") {
+        tg.openTelegramLink(url);
+      } else {
+        window.open(url, "_blank");
+      }
+    }
+
     // Manager contact
     document.getElementById("manager-btn").addEventListener("click", () => {
-      if (tg) {
-        tg.openTelegramLink("https://t.me/tdd3vlp");
-      } else {
-        window.open("https://t.me/tdd3vlp", "_blank");
-      }
+      openTgLink("https://t.me/tdd3vlp");
     });
   </script>
 </body>
