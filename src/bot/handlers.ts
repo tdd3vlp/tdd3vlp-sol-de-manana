@@ -272,7 +272,10 @@ async function enterDialogueMode(ctx: Context): Promise<void> {
   }
 
   try {
-    const response = await callSolStart(chat);
+    const response = await callSolStart(
+      chat,
+      getPlanModel(getEffectivePlan(chat), telegramUserId),
+    );
     const rawText = assembleMessage(response);
     await saveMessage(chat.id, "assistant", rawText, JSON.stringify(response));
     await ctx.reply(
@@ -369,7 +372,7 @@ async function handleTranslationInput(
     return;
   }
 
-  const model = getPlanModel(chat.plan);
+  const model = getPlanModel(getEffectivePlan(chat), telegramUserId);
   try {
     const { translation, direction } = await translateBidirectional(
       userText,
@@ -446,7 +449,10 @@ async function handleCustomTopicInput(
   await updateChatMode(chat.id, "dialogue");
 
   try {
-    const response = await callSolStart(chat);
+    const response = await callSolStart(
+      chat,
+      getPlanModel(getEffectivePlan(chat), telegramUserId),
+    );
     const rawText = assembleMessage(response);
     await saveMessage(chat.id, "assistant", rawText, JSON.stringify(response));
     await ctx.reply(
@@ -507,7 +513,10 @@ export async function handleTopicCallback(ctx: Context): Promise<void> {
   }
 
   try {
-    const response = await callSolStart(chat);
+    const response = await callSolStart(
+      chat,
+      getPlanModel(getEffectivePlan(chat), telegramUserId),
+    );
     const rawText = assembleMessage(response);
     await saveMessage(chat.id, "assistant", rawText, JSON.stringify(response));
     await ctx.reply(
@@ -591,7 +600,12 @@ export async function handleMessage(ctx: Context): Promise<void> {
   const llmHistory = buildLLMContext(recentMessages);
 
   try {
-    const response = await callSol(userText, llmHistory, chat);
+    const response = await callSol(
+      userText,
+      llmHistory,
+      chat,
+      getPlanModel(getEffectivePlan(chat), telegramUserId),
+    );
 
     // Persist the user message only after a successful LLM response —
     // otherwise a failed call leaves an unanswered message in history and
@@ -745,15 +759,22 @@ export async function handleSetPlan(ctx: Context): Promise<void> {
     return;
   }
 
-  const args = ctx.message?.text?.split(" ").slice(1);
-  const targetChatId = args?.[0];
-  const plan = args?.[1];
+  const args = ctx.message?.text?.trim().split(/\s+/).slice(1) ?? [];
+  // Two forms: "/setplan <plan>" for the admin's own chat,
+  // "/setplan <telegramId> <plan>" for any chat (private chat id == user id).
+  const selfForm = args.length === 1;
+  const targetChatId = selfForm ? ctx.chat?.id?.toString() : args[0];
+  const plan = selfForm ? args[0] : args[1];
 
   if (!targetChatId || !plan || !(plan in PLAN_LIMITS)) {
-    await ctx.reply("Использование: /setplan <chatId> <free|basic|premium>");
+    await ctx.reply(
+      "Использование:\n/setplan <free|basic|premium> — для себя\n/setplan <telegramId> <free|basic|premium> — для пользователя",
+    );
     return;
   }
 
   await upgradeChatPlan(targetChatId, plan);
-  await ctx.reply(`План для ${targetChatId} изменён на ${plan}.`);
+  await ctx.reply(
+    `План для ${targetChatId} изменён на ${plan} (модель: ${getPlanModel(plan)}).`,
+  );
 }

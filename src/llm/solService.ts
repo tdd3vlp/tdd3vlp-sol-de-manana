@@ -31,7 +31,8 @@ async function attemptParse(
   });
   const parsed = completion.choices[0]?.message?.parsed;
   if (!parsed) throw new Error("Empty parsed response from OpenAI");
-  if (config.nodeEnv !== "production") console.log("[LLM raw]", JSON.stringify(parsed));
+  if (config.nodeEnv !== "production")
+    console.log(`[LLM ${model}]`, JSON.stringify(parsed));
   return parsed;
 }
 
@@ -91,8 +92,10 @@ export async function translateToRussian(text: string, model: string): Promise<s
   );
 }
 
-export async function callSolStart(chat: Chat): Promise<SolResponse> {
-  const model = getPlanModel(chat.plan);
+export async function callSolStart(
+  chat: Chat,
+  model: string = getPlanModel(chat.plan),
+): Promise<SolResponse> {
   const messages: ChatCompletionMessageParam[] = [
     { role: "system", content: buildStartSystemPrompt(chat.currentTheme) },
     { role: "user", content: "hola" },
@@ -126,7 +129,8 @@ export async function callSolStart(chat: Chat): Promise<SolResponse> {
 export async function callSol(
   userText: string,
   history: LLMMessage[],
-  chat: Chat
+  chat: Chat,
+  model: string = getPlanModel(chat.plan),
 ): Promise<SolResponse> {
   const nonsense = isNonsense(userText);
   if (nonsense || isLikelyUnsupported(userText)) {
@@ -139,7 +143,6 @@ export async function callSol(
     };
   }
 
-  const model = getPlanModel(chat.plan);
   const baseMessages: ChatCompletionMessageParam[] = [
     { role: "system", content: buildSystemPrompt(chat.currentTheme) },
     ...history.map((m) => ({ role: m.role, content: m.content })),
