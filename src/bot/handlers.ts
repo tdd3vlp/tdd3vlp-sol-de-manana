@@ -74,6 +74,7 @@ function meaningful(s: string | null): s is string {
 
 function sanitizeNullTokens(s: string): string {
   return s
+    .replace(/\/n/g, "\n")
     .replace(/^(\s*:?null[,.:;]?\s*\n*)+/i, "")
     .replace(/\bnull[,.:;]?\s*/gi, "")
     .replace(/\n{3,}/g, "\n\n")

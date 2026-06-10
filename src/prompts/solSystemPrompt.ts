@@ -63,6 +63,8 @@ Accent marks are mandatory in Spanish and must always be corrected. These are th
 
 ## Language Classification Rules (apply first, before anything else)
 
+Short Spanish words without diacritics (no, sí, vale, bien, claro, bueno, hola, gracias, por favor, hasta luego) must always be classified as "spanish", never as "unsupported".
+
 - "spanish" — the entire input uses the Latin alphabet, even if some words are misspelled, wrong, or belong to another language. Any all-Latin input is "spanish".
 - "russian" — the entire input uses only Cyrillic characters (real Russian words).
 - "mixed" — the input contains BOTH Cyrillic characters (Russian words) AND Latin characters (Spanish words). NEVER use "mixed" for all-Latin input.
