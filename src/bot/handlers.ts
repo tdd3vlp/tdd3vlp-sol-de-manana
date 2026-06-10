@@ -40,8 +40,8 @@ const WELCOME_STICKER_ID =
   "CAACAgIAAxkBAAIG_GopKYTJ-OV5SI0py5HVx7uUI3kVAAJKngACJo1ISanGJVJBcnbeOwQ";
 
 const BTN_MAIN_MENU = "Главное меню";
-const BTN_MODE_TRANSLATION = "Перевести";
-const BTN_MODE_DIALOGUE = "Поговорить";
+const BTN_MODE_TRANSLATION = "Режим перевода";
+const BTN_MODE_DIALOGUE = "Режим диалога";
 
 const dialogueReplyKeyboard = new Keyboard()
   .text(BTN_MAIN_MENU)
@@ -58,7 +58,7 @@ const translationReplyKeyboard = new Keyboard()
 // InlineKeyboard attached to each bot dialogue message
 const botKeyboard = new InlineKeyboard()
   .text("Выбрать тему", "topic_menu")
-  .text("🇷🇺 Перевести", "translate");
+  .text("Перевести 🇷🇺", "translate");
 
 function buildMainMenuKeyboard(): InlineKeyboard {
   return new InlineKeyboard().text("Hola, Sol 👋", "mode_dialogue");
@@ -257,9 +257,14 @@ async function enterDialogueMode(ctx: Context): Promise<void> {
     await incrementDailyCount(chat.id);
     const rawText = assembleMessage(response);
     await saveMessage(chat.id, "assistant", rawText, JSON.stringify(response));
-    await ctx.reply(formatForTelegram(rawText), {
+    const sent = await ctx.reply(formatForTelegram(rawText), {
       parse_mode: "HTML",
       reply_markup: dialogueReplyKeyboard,
+    });
+    // dialogueReplyKeyboard sets the persistent bottom keyboard;
+    // immediately edit to also show inline buttons on this message
+    await ctx.api.editMessageReplyMarkup(ctx.chat!.id, sent.message_id, {
+      reply_markup: botKeyboard,
     });
   } catch (error) {
     console.error("enterDialogueMode error:", error);
