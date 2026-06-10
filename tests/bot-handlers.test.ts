@@ -373,6 +373,8 @@ describe("handleMessage", () => {
     expect(ctx.reply).toHaveBeenCalledWith(
       expect.stringContaining("inténtalo")
     );
+    // No orphan user message must remain in history after an LLM failure
+    expect(saveMessage).not.toHaveBeenCalled();
   });
 
   it("does nothing when message text is missing", async () => {

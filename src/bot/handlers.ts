@@ -626,10 +626,14 @@ export async function handleMessage(ctx: Context): Promise<void> {
 
   const recentMessages = await getRecentMessages(chat.id, 14);
   const llmHistory = buildLLMContext(recentMessages);
-  await saveMessage(chat.id, "user", userText);
 
   try {
     const response = await callSol(userText, llmHistory, chat);
+
+    // Persist the user message only after a successful LLM response —
+    // otherwise a failed call leaves an unanswered message in history and
+    // the next request gets a broken context.
+    await saveMessage(chat.id, "user", userText);
 
     if (
       response.inputLanguage !== "unsupported" &&
