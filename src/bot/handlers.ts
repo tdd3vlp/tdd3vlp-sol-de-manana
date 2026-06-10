@@ -39,9 +39,9 @@ import type { SolResponse } from "../llm/schemas.js";
 const WELCOME_STICKER_ID =
   "CAACAgIAAxkBAAIG_GopKYTJ-OV5SI0py5HVx7uUI3kVAAJKngACJo1ISanGJVJBcnbeOwQ";
 
-const BTN_MAIN_MENU = "🏠 Главное меню";
-const BTN_MODE_TRANSLATION = "🌍 Перевести";
-const BTN_MODE_DIALOGUE = "💬 Поговорить";
+const BTN_MAIN_MENU = "Главное меню";
+const BTN_MODE_TRANSLATION = "Перевести";
+const BTN_MODE_DIALOGUE = "Поговорить";
 
 const dialogueReplyKeyboard = new Keyboard()
   .text(BTN_MAIN_MENU)
@@ -62,9 +62,9 @@ const botKeyboard = new InlineKeyboard()
 
 function buildMainMenuKeyboard(): InlineKeyboard {
   return new InlineKeyboard()
-    .text("💬 Поговорить", "mode_dialogue")
+    .text("Режим общения", "mode_dialogue")
     .row()
-    .text("🌍 Перевести", "mode_translation");
+    .text("Режим перевода", "mode_translation");
 }
 
 function buildSubscribeKeyboard(): InlineKeyboard {
