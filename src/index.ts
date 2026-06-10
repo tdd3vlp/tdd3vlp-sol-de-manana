@@ -1,6 +1,7 @@
 import { Bot } from "grammy";
 import { config } from "./config/env.js";
 import { registerCommands } from "./bot/commands.js";
+import { prisma } from "./db/prisma.js";
 
 const bot = new Bot(config.telegramBotToken);
 
@@ -26,5 +27,15 @@ async function main() {
   bot.start();
   console.log("Sol de Mañana is running...");
 }
+
+async function shutdown(signal: string): Promise<void> {
+  console.log(`Received ${signal}, shutting down...`);
+  await bot.stop();
+  await prisma.$disconnect();
+  process.exit(0);
+}
+
+process.once("SIGINT", () => void shutdown("SIGINT"));
+process.once("SIGTERM", () => void shutdown("SIGTERM"));
 
 main().catch(console.error);
