@@ -61,10 +61,7 @@ const botKeyboard = new InlineKeyboard()
   .text("🇷🇺 Перевести", "translate");
 
 function buildMainMenuKeyboard(): InlineKeyboard {
-  return new InlineKeyboard()
-    .text("Режим общения", "mode_dialogue")
-    .row()
-    .text("Режим перевода", "mode_translation");
+  return new InlineKeyboard().text("Hola, Sol 👋", "mode_dialogue");
 }
 
 function buildSubscribeKeyboard(): InlineKeyboard {
@@ -77,13 +74,13 @@ function buildSubscribeKeyboard(): InlineKeyboard {
 async function sendPaywall(ctx: Context): Promise<void> {
   await ctx.reply(
     "На сегодня сообщения закончились.\nОбнови подписку, чтобы продолжить.",
-    { reply_markup: buildSubscribeKeyboard() }
+    { reply_markup: buildSubscribeKeyboard() },
   );
 }
 
 async function sendSubscriptionInvoice(
   ctx: Context,
-  plan: "basic" | "premium"
+  plan: "basic" | "premium",
 ): Promise<void> {
   const labels: Record<string, string> = {
     basic: "Basic — 100 сообщений в день",
@@ -96,7 +93,7 @@ async function sendSubscriptionInvoice(
     "Доступ к Sol de Mañana",
     `plan:${plan}`,
     "XTR",
-    [{ label: labels[plan], amount: stars }]
+    [{ label: labels[plan], amount: stars }],
   );
 }
 
@@ -107,13 +104,17 @@ const TIPS =
   `— Можете написать ответ полностью или частично на русском языке.\n` +
   `— Меняйте тему в любой момент и изучайте лексику.`;
 
-const HELP =
-  `Если у вас возникли вопросы или предложения, напишите менеджеру.\n\nМенеджер отвечает в течение 24 часов.`;
+const HELP = `Если у вас возникли вопросы или предложения, напишите менеджеру.\n\nМенеджер отвечает в течение 24 часов.`;
 
 function meaningful(s: string | null): s is string {
   if (!s) return false;
   const t = s.trim().toLowerCase();
-  return t.length > 1 && t !== "null" && !/^:?null[,.:;]?\s*$/.test(t) && /[a-záéíóúüñа-яёА-ЯЁ]/i.test(t);
+  return (
+    t.length > 1 &&
+    t !== "null" &&
+    !/^:?null[,.:;]?\s*$/.test(t) &&
+    /[a-záéíóúüñа-яёА-ЯЁ]/i.test(t)
+  );
 }
 
 function sanitizeNullTokens(s: string): string {
@@ -148,7 +149,10 @@ export function diffAndBold(original: string, corrected: string): string {
 const UNSUPPORTED_WARNING =
   "Por favor, escribe en español o ruso para que podamos continuar.";
 
-export function assembleMessage(response: SolResponse, userInput?: string): string {
+export function assembleMessage(
+  response: SolResponse,
+  userInput?: string,
+): string {
   if (
     response.inputLanguage === "unsupported" ||
     response.inputLanguage === "nonsense"
@@ -162,22 +166,31 @@ export function assembleMessage(response: SolResponse, userInput?: string): stri
     const plain = correction.replace(/\*\*(.+?)\*\*/g, "$1");
     if (
       userInput &&
-      (response.inputLanguage === "spanish" || response.inputLanguage === "mixed")
+      (response.inputLanguage === "spanish" ||
+        response.inputLanguage === "mixed")
     ) {
-      const prefixMatch = plain.match(/(?:Corrección:|En español:)\s*([\s\S]*)/i);
+      const prefixMatch = plain.match(
+        /(?:Corrección:|En español:)\s*([\s\S]*)/i,
+      );
       const withoutPrefix = prefixMatch ? prefixMatch[1].trim() : plain.trim();
       const bolded = diffAndBold(userInput, withoutPrefix);
-      const prefix = response.inputLanguage === "spanish" ? "Corrección:" : "En español:";
+      const prefix =
+        response.inputLanguage === "spanish" ? "Corrección:" : "En español:";
       correction = bolded ? `${prefix} ${bolded}` : "";
     } else {
       correction = plain;
     }
     if (meaningful(correction)) parts.push(correction);
   }
-  const cont = sanitizeNullTokens(response.continuation).replace(/\*\*(.+?)\*\*/g, "$1");
+  const cont = sanitizeNullTokens(response.continuation).replace(
+    /\*\*(.+?)\*\*/g,
+    "$1",
+  );
   parts.push(cont || UNSUPPORTED_WARNING);
   const result = parts.join("\n\n");
-  return result.replace(/\bnull\b[,.:;]?\s*/gi, "").trim() || UNSUPPORTED_WARNING;
+  return (
+    result.replace(/\bnull\b[,.:;]?\s*/gi, "").trim() || UNSUPPORTED_WARNING
+  );
 }
 
 export function formatForTelegram(text: string): string {
@@ -194,7 +207,7 @@ async function showMainMenu(ctx: Context): Promise<void> {
   const firstName = ctx.from?.first_name ?? "друг";
   await ctx.reply(
     `Привет, ${firstName}! Я Sol, твой друг в изучении испанского языка.`,
-    { reply_markup: buildMainMenuKeyboard() }
+    { reply_markup: buildMainMenuKeyboard() },
   );
 }
 
@@ -210,7 +223,7 @@ export async function handleStart(ctx: Context): Promise<void> {
   await ctx.replyWithSticker(WELCOME_STICKER_ID);
   await ctx.reply(
     `Привет, ${firstName}! Я Sol, твой друг в изучении испанского языка.`,
-    { reply_markup: buildMainMenuKeyboard() }
+    { reply_markup: buildMainMenuKeyboard() },
   );
 }
 
@@ -229,7 +242,10 @@ async function enterDialogueMode(ctx: Context): Promise<void> {
   let chat = await getOrCreateChat(telegramChatId, pickRandomTheme());
   await updateChatMode(chat.id, "dialogue");
 
-  const { allowed, chat: freshChat } = await checkAndMaybeReset(chat, telegramUserId);
+  const { allowed, chat: freshChat } = await checkAndMaybeReset(
+    chat,
+    telegramUserId,
+  );
   chat = freshChat;
   if (!allowed) {
     await sendPaywall(ctx);
@@ -241,17 +257,15 @@ async function enterDialogueMode(ctx: Context): Promise<void> {
     await incrementDailyCount(chat.id);
     const rawText = assembleMessage(response);
     await saveMessage(chat.id, "assistant", rawText, JSON.stringify(response));
-    // First send with ReplyKeyboard to set it, then InlineKeyboard on the message
-    await ctx.reply("Режим диалога. Напиши что-нибудь по-испански или по-русски.", {
-      reply_markup: dialogueReplyKeyboard,
-    });
     await ctx.reply(formatForTelegram(rawText), {
       parse_mode: "HTML",
-      reply_markup: botKeyboard,
+      reply_markup: dialogueReplyKeyboard,
     });
   } catch (error) {
     console.error("enterDialogueMode error:", error);
-    await ctx.reply("Lo siento, ocurrió un error. Por favor, inténtalo de nuevo.");
+    await ctx.reply(
+      "Lo siento, ocurrió un error. Por favor, inténtalo de nuevo.",
+    );
   }
 }
 
@@ -269,42 +283,54 @@ async function enterTranslationMode(ctx: Context): Promise<void> {
 
   const chat = await getOrCreateChat(telegramChatId, pickRandomTheme());
 
-  if (chat.plan !== "premium" && !(telegramUserId && isAdminUser(telegramUserId))) {
-    await ctx.reply(
-      "Режим перевода доступен только на тарифе Premium.",
-      { reply_markup: buildSubscribeKeyboard() }
-    );
+  if (
+    chat.plan !== "premium" &&
+    !(telegramUserId && isAdminUser(telegramUserId))
+  ) {
+    await ctx.reply("Режим перевода доступен только на тарифе Premium.", {
+      reply_markup: buildSubscribeKeyboard(),
+    });
     return;
   }
 
   await updateChatMode(chat.id, "translation");
   await ctx.reply(
     "Режим перевода. Отправь текст на русском или испанском — я переведу его.",
-    { reply_markup: translationReplyKeyboard }
+    { reply_markup: translationReplyKeyboard },
   );
 }
 
-export async function handleModeTranslationCallback(ctx: Context): Promise<void> {
+export async function handleModeTranslationCallback(
+  ctx: Context,
+): Promise<void> {
   await ctx.answerCallbackQuery();
   await enterTranslationMode(ctx);
 }
 
-async function handleTranslationInput(ctx: Context, userText: string): Promise<void> {
+async function handleTranslationInput(
+  ctx: Context,
+  userText: string,
+): Promise<void> {
   const telegramChatId = ctx.chat?.id?.toString();
   const telegramUserId = ctx.from?.id?.toString();
   if (!telegramChatId) return;
 
   let chat = await getOrCreateChat(telegramChatId, pickRandomTheme());
 
-  if (chat.plan !== "premium" && !(telegramUserId && isAdminUser(telegramUserId))) {
-    await ctx.reply(
-      "Режим перевода доступен только на тарифе Premium.",
-      { reply_markup: buildSubscribeKeyboard() }
-    );
+  if (
+    chat.plan !== "premium" &&
+    !(telegramUserId && isAdminUser(telegramUserId))
+  ) {
+    await ctx.reply("Режим перевода доступен только на тарифе Premium.", {
+      reply_markup: buildSubscribeKeyboard(),
+    });
     return;
   }
 
-  const { allowed, chat: freshChat } = await checkAndMaybeReset(chat, telegramUserId);
+  const { allowed, chat: freshChat } = await checkAndMaybeReset(
+    chat,
+    telegramUserId,
+  );
   chat = freshChat;
   if (!allowed) {
     await sendPaywall(ctx);
@@ -313,7 +339,10 @@ async function handleTranslationInput(ctx: Context, userText: string): Promise<v
 
   const model = getPlanModel(chat.plan);
   try {
-    const { translation, direction } = await translateBidirectional(userText, model);
+    const { translation, direction } = await translateBidirectional(
+      userText,
+      model,
+    );
     await incrementDailyCount(chat.id);
     const label = direction === "ru→es" ? "🇪🇸 Испанский:" : "🇷🇺 Русский:";
     await ctx.reply(`${label}\n\n${translation}`, {
@@ -340,7 +369,9 @@ function buildTopicKeyboard(): InlineKeyboard {
 
 export async function handleTopicMenu(ctx: Context): Promise<void> {
   await ctx.answerCallbackQuery();
-  await ctx.reply("Выбери тему для разговора:", { reply_markup: buildTopicKeyboard() });
+  await ctx.reply("Выбери тему для разговора:", {
+    reply_markup: buildTopicKeyboard(),
+  });
 }
 
 export async function handleMoreThemes(ctx: Context): Promise<void> {
@@ -361,7 +392,10 @@ export async function handleTopicCallback(ctx: Context): Promise<void> {
   chat = await updateChatTheme(chat.id, theme, 0);
   await updateChatMode(chat.id, "dialogue");
 
-  const { allowed, chat: freshChat } = await checkAndMaybeReset(chat, telegramUserId);
+  const { allowed, chat: freshChat } = await checkAndMaybeReset(
+    chat,
+    telegramUserId,
+  );
   chat = freshChat;
   if (!allowed) {
     await sendPaywall(ctx);
@@ -379,7 +413,9 @@ export async function handleTopicCallback(ctx: Context): Promise<void> {
     });
   } catch (error) {
     console.error("handleTopicCallback error:", error);
-    await ctx.reply("Lo siento, ocurrió un error. Por favor, inténtalo de nuevo.");
+    await ctx.reply(
+      "Lo siento, ocurrió un error. Por favor, inténtalo de nuevo.",
+    );
   }
 }
 
@@ -452,7 +488,10 @@ export async function handleMessage(ctx: Context): Promise<void> {
   }
 
   // Dialogue mode flow
-  const { allowed, chat: freshChat } = await checkAndMaybeReset(chat, telegramUserId);
+  const { allowed, chat: freshChat } = await checkAndMaybeReset(
+    chat,
+    telegramUserId,
+  );
   chat = freshChat;
   if (!allowed) {
     await sendPaywall(ctx);
@@ -494,12 +533,12 @@ export async function handleMessage(ctx: Context): Promise<void> {
       console.error("LLM service error in handleMessage:", error);
       await ctx.reply(
         "Lo siento, tuve un problema al procesar tu mensaje. Por favor, inténtalo de nuevo. " +
-          "/ Извини, возникла проблема. Попробуй ещё раз."
+          "/ Извини, возникла проблема. Попробуй ещё раз.",
       );
     } else {
       console.error("Unexpected error in handleMessage:", error);
       await ctx.reply(
-        "Lo siento, ocurrió un error inesperado. / Произошла неожиданная ошибка."
+        "Lo siento, ocurrió un error inesperado. / Произошла неожиданная ошибка.",
       );
     }
   }
@@ -508,12 +547,14 @@ export async function handleMessage(ctx: Context): Promise<void> {
 // ─── Subscription handlers ────────────────────────────────────────────────────
 
 export async function handleSubscribe(ctx: Context): Promise<void> {
-  const keyboard = buildSubscribeKeyboard().row().text("Продолжить диалог →", "continue_dialogue");
+  const keyboard = buildSubscribeKeyboard()
+    .row()
+    .text("Продолжить диалог →", "continue_dialogue");
   await ctx.reply(
     "Подписка Sol de Mañana:\n\n" +
-    `Basic — ${PLAN_PRICES_STARS.basic} ⭐ — 100 сообщений в день\n` +
-    `Premium — ${PLAN_PRICES_STARS.premium} ⭐ — 300 сообщений в день`,
-    { reply_markup: keyboard }
+      `Basic — ${PLAN_PRICES_STARS.basic} ⭐ — 100 сообщений в день\n` +
+      `Premium — ${PLAN_PRICES_STARS.premium} ⭐ — 300 сообщений в день`,
+    { reply_markup: keyboard },
   );
 }
 
@@ -541,7 +582,8 @@ export async function handleSuccessfulPayment(ctx: Context): Promise<void> {
 
   const confirmations: Record<string, string> = {
     basic: "Подписка Basic активирована. Теперь у тебя 100 сообщений в день.",
-    premium: "Подписка Premium активирована. Теперь у тебя 300 сообщений в день.",
+    premium:
+      "Подписка Premium активирована. Теперь у тебя 300 сообщений в день.",
   };
   await ctx.reply(confirmations[plan] ?? "Подписка активирована.");
 }
@@ -574,7 +616,9 @@ export async function handleTranslate(ctx: Context): Promise<void> {
   await ctx.answerCallbackQuery();
 
   const telegramChatId = ctx.chat?.id?.toString();
-  const chat = telegramChatId ? await getOrCreateChat(telegramChatId, pickRandomTheme()) : null;
+  const chat = telegramChatId
+    ? await getOrCreateChat(telegramChatId, pickRandomTheme())
+    : null;
   const model = getPlanModel(chat?.plan ?? "free");
   const textToTranslate = stripCorrectionLine(originalText);
 
