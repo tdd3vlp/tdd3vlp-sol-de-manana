@@ -241,13 +241,25 @@ export async function handleTopicCallback(ctx: Context): Promise<void> {
   }
 }
 
+const continueButton = new InlineKeyboard().text("Продолжить диалог →", "continue_dialogue");
+
+export async function handleContinueDialogue(ctx: Context): Promise<void> {
+  await ctx.answerCallbackQuery();
+  await ctx.reply("Продолжаем! Напиши что-нибудь по-испански или по-русски.", {
+    reply_markup: botKeyboard,
+  });
+}
+
 export async function handleTips(ctx: Context): Promise<void> {
-  await ctx.reply(TIPS);
+  await ctx.reply(TIPS, { reply_markup: continueButton });
 }
 
 export async function handleHelp(ctx: Context): Promise<void> {
   await ctx.reply(HELP, {
-    reply_markup: new InlineKeyboard().url("Написать менеджеру", "https://t.me/tdd3vlp"),
+    reply_markup: new InlineKeyboard()
+      .url("Написать менеджеру", "https://t.me/tdd3vlp")
+      .row()
+      .text("Продолжить диалог →", "continue_dialogue"),
   });
 }
 
@@ -328,9 +340,8 @@ export async function handleSubscribe(ctx: Context): Promise<void> {
     const chat = await getOrCreateChat(telegramChatId, pickRandomTheme());
     plan = chat.plan;
   }
-  await ctx.reply("Подписка Sol de Mañana:", {
-    reply_markup: buildSubscribeKeyboard(plan),
-  });
+  const keyboard = buildSubscribeKeyboard(plan).row().text("Продолжить диалог →", "continue_dialogue");
+  await ctx.reply("Подписка Sol de Mañana:", { reply_markup: keyboard });
 }
 
 export async function handleWebAppData(ctx: Context): Promise<void> {
