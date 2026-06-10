@@ -23,8 +23,11 @@ async function attemptParse(
   const completion = await openai.beta.chat.completions.parse({
     model,
     messages,
+    // The JSON payload carries a 3-sentence continuation plus its Russian
+    // translation (Cyrillic tokenizes at ~2-3 tokens/word) and a correction.
+    // A tight cap truncates the JSON and the whole structured parse fails.
     response_format: zodResponseFormat(SolResponseSchema, "sol_response"),
-    max_tokens: 150,
+    max_tokens: 500,
   });
   const parsed = completion.choices[0]?.message?.parsed;
   if (!parsed) throw new Error("Empty parsed response from OpenAI");
