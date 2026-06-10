@@ -23,6 +23,19 @@ model Chat {
   messages          Message[]
 }
 
+model Payment {
+  id                      String    @id @default(cuid())
+  telegramChatId          String
+  plan                    String
+  amount                  Int
+  currency                String
+  telegramPaymentChargeId String    @unique
+  providerPaymentChargeId String?
+  isRecurring             Boolean   @default(false)
+  expiresAt               DateTime?
+  createdAt               DateTime  @default(now())
+}
+
 model Message {
   id        String   @id @default(cuid())
   chatId    String

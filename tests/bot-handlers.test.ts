@@ -26,6 +26,10 @@ vi.mock("../src/db/chatHistory.js", () => ({
   upgradeChatPlan: vi.fn(),
 }));
 
+vi.mock("../src/db/payments.js", () => ({
+  recordPaymentOnce: vi.fn(),
+}));
+
 vi.mock("../src/llm/solService.js", () => ({
   callSol: vi.fn(),
   callSolStart: vi.fn(),
@@ -61,6 +65,7 @@ import {
   handleSuccessfulPayment,
 } from "../src/bot/handlers.js";
 import { upgradeChatPlan } from "../src/db/chatHistory.js";
+import { recordPaymentOnce } from "../src/db/payments.js";
 
 function makeCtx(opts: { chatId?: number; text?: string } = {}): Context {
   return {
@@ -79,6 +84,7 @@ beforeEach(() => {
   vi.mocked(incrementDailyCount).mockResolvedValue();
   // Default: limit not exceeded, return chat unchanged
   vi.mocked(checkAndMaybeReset).mockImplementation(async (chat) => ({ allowed: true, chat }));
+  vi.mocked(recordPaymentOnce).mockResolvedValue(true);
 });
 
 // ── assembleMessage ──────────────────────────────────────────────────────────
@@ -261,6 +267,44 @@ describe("handleSuccessfulPayment", () => {
 
   it("ignores unknown payloads", async () => {
     const ctx = makePaymentCtx({ invoice_payload: "something:else" });
+
+    await handleSuccessfulPayment(ctx);
+
+    expect(upgradeChatPlan).not.toHaveBeenCalled();
+    expect(ctx.reply).not.toHaveBeenCalled();
+  });
+
+  it("records the charge for audit and refunds", async () => {
+    const ctx = makePaymentCtx({
+      invoice_payload: "plan:basic",
+      total_amount: 200,
+      currency: "XTR",
+      telegram_payment_charge_id: "charge-1",
+      provider_payment_charge_id: "provider-1",
+      is_recurring: true,
+    });
+
+    await handleSuccessfulPayment(ctx);
+
+    expect(recordPaymentOnce).toHaveBeenCalledWith(
+      expect.objectContaining({
+        telegramChatId: "12345",
+        plan: "basic",
+        amount: 200,
+        currency: "XTR",
+        telegramPaymentChargeId: "charge-1",
+        providerPaymentChargeId: "provider-1",
+        isRecurring: true,
+      })
+    );
+  });
+
+  it("skips duplicate payment updates without upgrading twice", async () => {
+    vi.mocked(recordPaymentOnce).mockResolvedValue(false);
+    const ctx = makePaymentCtx({
+      invoice_payload: "plan:basic",
+      telegram_payment_charge_id: "charge-1",
+    });
 
     await handleSuccessfulPayment(ctx);
 
