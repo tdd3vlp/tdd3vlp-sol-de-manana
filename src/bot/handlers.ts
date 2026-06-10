@@ -32,6 +32,7 @@ import {
   PLAN_PRICES_STARS,
   PLAN_PRICES_RUB,
   getPlanModel,
+  getEffectivePlan,
   PLAN_LIMITS,
   isAdminUser,
 } from "../subscription/plans.js";
@@ -312,7 +313,7 @@ async function enterTranslationMode(ctx: Context): Promise<void> {
   const chat = await getOrCreateChat(telegramChatId, pickRandomTheme());
 
   if (
-    chat.plan !== "premium" &&
+    getEffectivePlan(chat) !== "premium" &&
     !(telegramUserId && isAdminUser(telegramUserId))
   ) {
     await ctx.reply("Режим перевода доступен только на тарифе Premium.", {
@@ -346,7 +347,7 @@ async function handleTranslationInput(
   let chat = await getOrCreateChat(telegramChatId, pickRandomTheme());
 
   if (
-    chat.plan !== "premium" &&
+    getEffectivePlan(chat) !== "premium" &&
     !(telegramUserId && isAdminUser(telegramUserId))
   ) {
     await ctx.reply("Режим перевода доступен только на тарифе Premium.", {
@@ -422,7 +423,7 @@ export async function handleTopicMenu(ctx: Context): Promise<void> {
   const telegramChatId = ctx.chat?.id?.toString();
   const telegramUserId = ctx.from?.id?.toString();
   const plan = telegramChatId
-    ? (await getOrCreateChat(telegramChatId, pickRandomTheme())).plan
+    ? getEffectivePlan(await getOrCreateChat(telegramChatId, pickRandomTheme()))
     : "free";
   const isPremium = plan === "premium" || !!(telegramUserId && isAdminUser(telegramUserId));
   await showTopicMenu(ctx, isPremium);
@@ -433,7 +434,7 @@ export async function handleMoreThemes(ctx: Context): Promise<void> {
   const telegramChatId = ctx.chat?.id?.toString();
   const telegramUserId = ctx.from?.id?.toString();
   const plan = telegramChatId
-    ? (await getOrCreateChat(telegramChatId, pickRandomTheme())).plan
+    ? getEffectivePlan(await getOrCreateChat(telegramChatId, pickRandomTheme()))
     : "free";
   const isPremium = plan === "premium" || !!(telegramUserId && isAdminUser(telegramUserId));
   await ctx.editMessageReplyMarkup({ reply_markup: buildTopicKeyboard(isPremium) });
@@ -487,7 +488,10 @@ export async function handleCustomTopicCallback(ctx: Context): Promise<void> {
   if (!telegramChatId) return;
 
   const chat = await getOrCreateChat(telegramChatId, pickRandomTheme());
-  if (chat.plan !== "premium" && !(telegramUserId && isAdminUser(telegramUserId))) {
+  if (
+    getEffectivePlan(chat) !== "premium" &&
+    !(telegramUserId && isAdminUser(telegramUserId))
+  ) {
     await ctx.reply("Своя тема доступна только на тарифе Premium.", {
       reply_markup: buildSubscribeKeyboard(),
     });
@@ -547,7 +551,7 @@ export async function handleContinueDialogue(ctx: Context): Promise<void> {
   const telegramChatId = ctx.chat?.id?.toString();
   const telegramUserId = ctx.from?.id?.toString();
   const plan = telegramChatId
-    ? (await getOrCreateChat(telegramChatId, pickRandomTheme())).plan
+    ? getEffectivePlan(await getOrCreateChat(telegramChatId, pickRandomTheme()))
     : "free";
   await ctx.reply("Продолжаем! Напиши что-нибудь по-испански или по-русски.", {
     reply_markup: buildDialogueKeyboard(plan, telegramUserId),
@@ -592,7 +596,8 @@ export async function handleMessage(ctx: Context): Promise<void> {
   if (userText === BTN_TOPIC_MENU) {
     const chat = await getOrCreateChat(telegramChatId, pickRandomTheme());
     const isPremium =
-      chat.plan === "premium" || !!(telegramUserId && isAdminUser(telegramUserId));
+      getEffectivePlan(chat) === "premium" ||
+      !!(telegramUserId && isAdminUser(telegramUserId));
     await showTopicMenu(ctx, isPremium);
     return;
   }

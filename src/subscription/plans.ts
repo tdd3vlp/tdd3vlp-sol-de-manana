@@ -36,6 +36,23 @@ export function getPlanLimit(plan: string): number {
   return PLAN_LIMITS[plan as Plan] ?? PLAN_LIMITS.free;
 }
 
+// The plan as it should be applied right now: an expired paid plan counts as
+// free even before consumeDailyMessage persists the downgrade to the DB.
+// planExpiresAt = null means no expiry (free plan or admin-granted).
+export function getEffectivePlan(chat: {
+  plan: string;
+  planExpiresAt: Date | null;
+}): string {
+  if (
+    chat.plan !== "free" &&
+    chat.planExpiresAt &&
+    chat.planExpiresAt < new Date()
+  ) {
+    return "free";
+  }
+  return chat.plan;
+}
+
 // Returns the start of today in UTC, adjusted so that "day boundary" is midnight UTC+3
 export function getTodayStartUTC3(): Date {
   const utc3OffsetMs = 3 * 60 * 60 * 1000;
