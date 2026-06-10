@@ -42,10 +42,13 @@ const BTN_TOPIC_MENU = "Выбор темы";
 const BTN_MODE_TRANSLATION = "Режим перевода";
 const BTN_MODE_DIALOGUE = "Режим диалога";
 
-const dialogueReplyKeyboard = new Keyboard()
-  .text(BTN_TOPIC_MENU).text(BTN_MODE_TRANSLATION)
-  .resized()
-  .persistent();
+function buildDialogueKeyboard(plan: string, userId?: string): Keyboard {
+  const kb = new Keyboard().text(BTN_TOPIC_MENU);
+  if (plan === "premium" || (userId && isAdminUser(userId))) {
+    kb.text(BTN_MODE_TRANSLATION);
+  }
+  return kb.resized().persistent();
+}
 
 const translationReplyKeyboard = new Keyboard()
   .text(BTN_MODE_DIALOGUE)
@@ -247,7 +250,7 @@ async function enterDialogueMode(ctx: Context): Promise<void> {
     await saveMessage(chat.id, "assistant", rawText, JSON.stringify(response));
     await ctx.reply(
       formatForTelegram(rawText) + buildSpoiler(response.russianTranslation),
-      { parse_mode: "HTML", reply_markup: dialogueReplyKeyboard },
+      { parse_mode: "HTML", reply_markup: buildDialogueKeyboard(chat.plan, telegramUserId) },
     );
   } catch (error) {
     console.error("enterDialogueMode error:", error);
@@ -401,7 +404,7 @@ export async function handleTopicCallback(ctx: Context): Promise<void> {
     await saveMessage(chat.id, "assistant", rawText, JSON.stringify(response));
     await ctx.reply(
       formatForTelegram(rawText) + buildSpoiler(response.russianTranslation),
-      { parse_mode: "HTML", reply_markup: dialogueReplyKeyboard },
+      { parse_mode: "HTML", reply_markup: buildDialogueKeyboard(chat.plan, telegramUserId) },
     );
   } catch (error) {
     console.error("handleTopicCallback error:", error);
@@ -415,8 +418,13 @@ export async function handleTopicCallback(ctx: Context): Promise<void> {
 
 export async function handleContinueDialogue(ctx: Context): Promise<void> {
   await ctx.answerCallbackQuery();
+  const telegramChatId = ctx.chat?.id?.toString();
+  const telegramUserId = ctx.from?.id?.toString();
+  const plan = telegramChatId
+    ? (await getOrCreateChat(telegramChatId, pickRandomTheme())).plan
+    : "free";
   await ctx.reply("Продолжаем! Напиши что-нибудь по-испански или по-русски.", {
-    reply_markup: dialogueReplyKeyboard,
+    reply_markup: buildDialogueKeyboard(plan, telegramUserId),
   });
 }
 
@@ -513,7 +521,7 @@ export async function handleMessage(ctx: Context): Promise<void> {
     await saveMessage(chat.id, "assistant", rawText, JSON.stringify(response));
     await ctx.reply(
       formatForTelegram(rawText) + buildSpoiler(response.russianTranslation),
-      { parse_mode: "HTML", reply_markup: dialogueReplyKeyboard },
+      { parse_mode: "HTML", reply_markup: buildDialogueKeyboard(chat.plan, telegramUserId) },
     );
   } catch (error) {
     if (error instanceof SolServiceError) {
