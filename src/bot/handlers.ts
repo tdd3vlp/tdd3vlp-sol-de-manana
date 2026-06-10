@@ -700,7 +700,23 @@ export async function handleDirectPayCallback(ctx: Context): Promise<void> {
 }
 
 export async function handlePreCheckout(ctx: Context): Promise<void> {
-  await ctx.answerPreCheckoutQuery(true);
+  const query = ctx.preCheckoutQuery;
+  const plan = query?.invoice_payload?.replace("plan:", "");
+  const valid =
+    !!query &&
+    (plan === "basic" || plan === "premium") &&
+    query.currency === "XTR" &&
+    query.total_amount === PLAN_PRICES_STARS[plan];
+
+  if (valid) {
+    await ctx.answerPreCheckoutQuery(true);
+  } else {
+    console.error("Rejected pre-checkout query:", JSON.stringify(query));
+    await ctx.answerPreCheckoutQuery(
+      false,
+      "Не удалось проверить платёж. Попробуйте оформить подписку заново.",
+    );
+  }
 }
 
 export async function handleSuccessfulPayment(ctx: Context): Promise<void> {
