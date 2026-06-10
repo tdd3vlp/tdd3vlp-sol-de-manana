@@ -139,7 +139,7 @@ describe("handleStart", () => {
     expect(resetChat).toHaveBeenCalledWith("12345", "supermarket");
     expect(callSolStart).not.toHaveBeenCalled();
     expect(ctx.replyWithSticker).toHaveBeenCalledOnce();
-    expect(ctx.reply).toHaveBeenCalledTimes(2);
+    expect(ctx.reply).toHaveBeenCalledOnce();
     const firstReplyText = vi.mocked(ctx.reply).mock.calls[0][0] as string;
     expect(firstReplyText).toContain("Sol");
   });

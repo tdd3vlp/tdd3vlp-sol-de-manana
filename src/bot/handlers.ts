@@ -62,8 +62,6 @@ const botKeyboard = new InlineKeyboard()
 
 function buildMainMenuKeyboard(): InlineKeyboard {
   return new InlineKeyboard()
-    .text("📖 Рекомендации", "tips")
-    .row()
     .text("💬 Режим диалога", "mode_dialogue")
     .row()
     .text("🔄 Режим перевода", "mode_translation");
@@ -196,9 +194,8 @@ async function showMainMenu(ctx: Context): Promise<void> {
   const firstName = ctx.from?.first_name ?? "друг";
   await ctx.reply(
     `Привет, ${firstName}! Я Sol, твой друг в изучении испанского языка.`,
-    { reply_markup: { remove_keyboard: true } }
+    { reply_markup: buildMainMenuKeyboard() }
   );
-  await ctx.reply("Выбери режим:", { reply_markup: buildMainMenuKeyboard() });
 }
 
 export async function handleStart(ctx: Context): Promise<void> {
@@ -213,9 +210,8 @@ export async function handleStart(ctx: Context): Promise<void> {
   await ctx.replyWithSticker(WELCOME_STICKER_ID);
   await ctx.reply(
     `Привет, ${firstName}! Я Sol, твой друг в изучении испанского языка.`,
-    { reply_markup: { remove_keyboard: true } }
+    { reply_markup: buildMainMenuKeyboard() }
   );
-  await ctx.reply("Выбери режим:", { reply_markup: buildMainMenuKeyboard() });
 }
 
 export async function handleMainMenuCallback(ctx: Context): Promise<void> {
