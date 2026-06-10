@@ -428,11 +428,12 @@ async function handleTranslationInput(
     return;
   }
 
-  const model = getPlanModel(getEffectivePlan(chat), telegramUserId);
   try {
+    // Translation is mechanical work — the cheap model handles it fine
+    // regardless of the user's plan.
     const { translation, direction } = await translateBidirectional(
       userText,
-      model,
+      config.openaiModelTranslate,
     );
     const label = direction === "ru→es" ? "🇪🇸 Испанский:" : "🇷🇺 Русский:";
     await ctx.reply(`${label}\n\n${translation}`, {
