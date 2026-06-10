@@ -10,13 +10,21 @@ bot.catch((err) => {
   console.error("Bot error:", err.error);
 });
 
-if (config.webAppUrl) {
-  bot.api.setChatMenuButton({
-    menu_button: { type: "web_app", text: "Sol de Mañana", web_app: { url: config.webAppUrl } },
-  });
-} else {
-  bot.api.setMyCommands([]);
+async function main() {
+  if (config.webAppUrl) {
+    try {
+      await bot.api.setChatMenuButton({
+        menu_button: { type: "web_app", text: "Sol de Mañana", web_app: { url: config.webAppUrl } },
+      });
+      console.log("Web App menu button set.");
+    } catch (err) {
+      console.error("Failed to set menu button:", err);
+    }
+  } else {
+    await bot.api.setMyCommands([]);
+  }
+  bot.start();
+  console.log("Sol de Mañana is running...");
 }
 
-bot.start();
-console.log("Sol de Mañana is running...");
+main().catch(console.error);

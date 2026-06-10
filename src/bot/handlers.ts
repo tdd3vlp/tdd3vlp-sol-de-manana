@@ -69,11 +69,23 @@ function buildSubscribeKeyboard(): InlineKeyboard {
     .text("Выбрать Premium", "pay:premium");
 }
 
-async function sendPaywall(ctx: Context): Promise<void> {
-  await ctx.reply(
-    "На сегодня сообщения закончились.\nОбнови подписку, чтобы продолжить.",
-    { reply_markup: buildSubscribeKeyboard() },
-  );
+async function sendPaywall(ctx: Context, plan = "free"): Promise<void> {
+  const isUpgrade = plan === "basic";
+  const text = isUpgrade
+    ? "Ты достиг лимита Basic.\nУлучши до Premium, чтобы получить 300 сообщений в день."
+    : "На сегодня сообщения закончились.\nОбнови подписку, чтобы продолжить.";
+
+  if (config.webAppUrl) {
+    const btnLabel = isUpgrade ? "Улучшить до Premium" : "Выбрать тариф";
+    await ctx.reply(text, {
+      reply_markup: new InlineKeyboard().webApp(btnLabel, config.webAppUrl),
+    });
+  } else {
+    const keyboard = isUpgrade
+      ? new InlineKeyboard().text("Выбрать Premium", "pay:premium")
+      : buildSubscribeKeyboard();
+    await ctx.reply(text, { reply_markup: keyboard });
+  }
 }
 
 async function sendSubscriptionInvoice(
@@ -242,7 +254,7 @@ async function enterDialogueMode(ctx: Context): Promise<void> {
   );
   chat = freshChat;
   if (!allowed) {
-    await sendPaywall(ctx);
+    await sendPaywall(ctx, chat.plan);
     return;
   }
 
@@ -327,7 +339,7 @@ async function handleTranslationInput(
   );
   chat = freshChat;
   if (!allowed) {
-    await sendPaywall(ctx);
+    await sendPaywall(ctx, chat.plan);
     return;
   }
 
@@ -412,7 +424,7 @@ async function handleCustomTopicInput(
 
   const { allowed, chat: freshChat } = await checkAndMaybeReset(chat, telegramUserId);
   if (!allowed) {
-    await sendPaywall(ctx);
+    await sendPaywall(ctx, chat.plan);
     return;
   }
   chat = freshChat;
@@ -474,7 +486,7 @@ export async function handleTopicCallback(ctx: Context): Promise<void> {
   );
   chat = freshChat;
   if (!allowed) {
-    await sendPaywall(ctx);
+    await sendPaywall(ctx, chat.plan);
     return;
   }
 
@@ -586,7 +598,7 @@ export async function handleMessage(ctx: Context): Promise<void> {
   );
   chat = freshChat;
   if (!allowed) {
-    await sendPaywall(ctx);
+    await sendPaywall(ctx, chat.plan);
     return;
   }
 

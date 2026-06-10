@@ -7,9 +7,6 @@ import {
   handleMoreThemes,
   handleCustomTopicCallback,
   handleUnsupportedMedia,
-  handleTips,
-  handleHelp,
-  handleSubscribe,
   handleWebAppData,
   handleContinueDialogue,
   handleDirectPayCallback,
@@ -23,9 +20,6 @@ import {
 
 export function registerCommands(bot: Bot): void {
   bot.command("start", handleStart);
-  bot.command("tips", handleTips);
-  bot.command("help", handleHelp);
-  bot.command("subscribe", handleSubscribe);
   bot.command("myid", handleMyId);
   bot.command("setplan", handleSetPlan);
   bot.on("message:web_app_data", handleWebAppData);
