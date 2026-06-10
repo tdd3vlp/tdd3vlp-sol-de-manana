@@ -201,7 +201,7 @@ function buildSpoiler(translation: string | null | undefined): string {
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;");
-  return `\n\n<tg-spoiler>${escaped}</tg-spoiler>`;
+  return `\n\n<tg-spoiler><i>(${escaped})</i></tg-spoiler>`;
 }
 
 // ─── Main menu ────────────────────────────────────────────────────────────────
