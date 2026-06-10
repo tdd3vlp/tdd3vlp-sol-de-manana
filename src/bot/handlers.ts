@@ -363,10 +363,9 @@ function buildTopicKeyboard(isPremium: boolean): InlineKeyboard {
     keyboard.text(THEME_LABELS[theme] ?? theme, `topic:${theme}`);
     if (i % 2 === 1) keyboard.row();
   });
+  keyboard.text("Другие темы →", "more_themes");
   if (isPremium) {
     keyboard.row().text(`${BTN_CUSTOM_TOPIC} →`, "custom_topic");
-  } else {
-    keyboard.text("Другие темы →", "more_themes");
   }
   return keyboard;
 }
