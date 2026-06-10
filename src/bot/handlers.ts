@@ -216,23 +216,44 @@ export function formatForTelegram(text: string): string {
 // Sends the reply immediately and appends the Russian spoiler afterwards:
 // the translation runs on a cheap model in the background and is edited into
 // the message, so the user never waits for it.
+//
+// Telegram refuses to edit messages sent with a reply keyboard, so when the
+// keyboard must be attached (mode/theme entry messages) the translation is
+// awaited inline instead and everything goes out as one message.
 async function replyWithSpoilerTranslation(
   ctx: Context,
   rawText: string,
   response: SolResponse,
-  plan: string,
-  telegramUserId?: string,
+  keyboard?: Keyboard,
 ): Promise<void> {
-  const sent = await ctx.reply(formatForTelegram(rawText), {
-    parse_mode: "HTML",
-    reply_markup: buildDialogueKeyboard(plan, telegramUserId),
-  });
-  if (
+  const skipTranslation =
     response.inputLanguage === "unsupported" ||
-    response.inputLanguage === "nonsense"
-  ) {
+    response.inputLanguage === "nonsense";
+
+  if (keyboard) {
+    let spoiler = "";
+    if (!skipTranslation) {
+      try {
+        const translation = await translateToRussian(
+          response.continuation,
+          config.openaiModelTranslate,
+        );
+        spoiler = buildSpoiler(translation);
+      } catch (error) {
+        console.error("Spoiler translation failed:", error);
+      }
+    }
+    await ctx.reply(formatForTelegram(rawText) + spoiler, {
+      parse_mode: "HTML",
+      reply_markup: keyboard,
+    });
     return;
   }
+
+  const sent = await ctx.reply(formatForTelegram(rawText), {
+    parse_mode: "HTML",
+  });
+  if (skipTranslation) return;
   void translateToRussian(response.continuation, config.openaiModelTranslate)
     .then((translation) =>
       ctx.api.editMessageText(
@@ -315,8 +336,7 @@ async function enterDialogueMode(ctx: Context): Promise<void> {
       ctx,
       rawText,
       response,
-      chat.plan,
-      telegramUserId,
+      buildDialogueKeyboard(chat.plan, telegramUserId),
     );
   } catch (error) {
     console.error("enterDialogueMode error:", error);
@@ -495,8 +515,7 @@ async function handleCustomTopicInput(
       ctx,
       rawText,
       response,
-      chat.plan,
-      telegramUserId,
+      buildDialogueKeyboard(chat.plan, telegramUserId),
     );
   } catch (error) {
     console.error("handleCustomTopicInput error:", error);
@@ -562,8 +581,7 @@ export async function handleTopicCallback(ctx: Context): Promise<void> {
       ctx,
       rawText,
       response,
-      chat.plan,
-      telegramUserId,
+      buildDialogueKeyboard(chat.plan, telegramUserId),
     );
   } catch (error) {
     console.error("handleTopicCallback error:", error);
@@ -675,13 +693,7 @@ export async function handleMessage(ctx: Context): Promise<void> {
 
     const rawText = assembleMessage(response, userText);
     await saveMessage(chat.id, "assistant", rawText, JSON.stringify(response));
-    await replyWithSpoilerTranslation(
-      ctx,
-      rawText,
-      response,
-      chat.plan,
-      telegramUserId,
-    );
+    await replyWithSpoilerTranslation(ctx, rawText, response);
   } catch (error) {
     if (consumed) await refundDailyMessage(chat.id);
     if (error instanceof SolServiceError) {
@@ -767,7 +779,7 @@ export async function handleSuccessfulPayment(ctx: Context): Promise<void> {
     return;
   }
 
-  await upgradeChatPlan(telegramChatId, plan, expiresAt);
+  const upgraded = await upgradeChatPlan(telegramChatId, plan, expiresAt);
 
   const isRenewal = payment.is_recurring && !payment.is_first_recurring;
   const confirmations: Record<string, string> = {
@@ -775,10 +787,19 @@ export async function handleSuccessfulPayment(ctx: Context): Promise<void> {
     premium:
       "Подписка Premium активирована. Теперь у тебя 300 сообщений в день.",
   };
+  // Dialogue replies no longer carry the reply keyboard (it would make them
+  // uneditable), so refresh the persistent bar here — an upgrade can add the
+  // translation-mode button.
   await ctx.reply(
     isRenewal
       ? `Подписка ${plan === "basic" ? "Basic" : "Premium"} продлена на месяц.`
       : confirmations[plan] ?? "Подписка активирована.",
+    {
+      reply_markup:
+        upgraded.mode === "translation"
+          ? translationReplyKeyboard
+          : buildDialogueKeyboard(upgraded.plan, ctx.from?.id?.toString()),
+    },
   );
 }
 

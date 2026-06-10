@@ -107,6 +107,9 @@ beforeEach(() => {
     chat,
   }));
   vi.mocked(recordPaymentOnce).mockResolvedValue(true);
+  vi.mocked(upgradeChatPlan).mockImplementation(async (_telegramChatId, plan) =>
+    makeChat({ plan }),
+  );
 });
 
 // ── assembleMessage ──────────────────────────────────────────────────────────
