@@ -417,7 +417,16 @@
           tg ? tg.close() : window.close();
           return;
         }
-        if (tg) tg.sendData(action);
+        // sendData only works for Web Apps opened from a reply keyboard,
+        // so payment goes through a /start deep link to the bot.
+        const plan = action.replace("pay:", "");
+        const payLink = "https://t.me/soldemanana_bot?start=pay_" + plan;
+        if (tg) {
+          tg.openTelegramLink(payLink);
+          tg.close();
+        } else {
+          window.open(payLink, "_blank");
+        }
       });
     });
 

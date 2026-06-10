@@ -155,6 +155,47 @@ describe("handleStart", () => {
     await handleStart(ctx);
     expect(ctx.reply).not.toHaveBeenCalled();
   });
+
+  it("sends a Stars invoice for pay_basic deep link without resetting chat", async () => {
+    const ctx = makeCtx();
+    (ctx as { match?: string }).match = "pay_basic";
+    (ctx as { api?: unknown }).api = { sendInvoice: vi.fn().mockResolvedValue({}) };
+
+    await handleStart(ctx);
+
+    expect(resetChat).not.toHaveBeenCalled();
+    expect(ctx.replyWithSticker).not.toHaveBeenCalled();
+    const call = vi.mocked(ctx.api.sendInvoice).mock.calls[0];
+    expect(call[0]).toBe(12345);
+    expect(call[3]).toBe("plan:basic");
+    expect(call[4]).toBe("XTR");
+    expect(call[5]).toEqual([{ label: expect.stringContaining("Basic"), amount: 200 }]);
+  });
+
+  it("sends a Stars invoice for pay_premium deep link", async () => {
+    const ctx = makeCtx();
+    (ctx as { match?: string }).match = "pay_premium";
+    (ctx as { api?: unknown }).api = { sendInvoice: vi.fn().mockResolvedValue({}) };
+
+    await handleStart(ctx);
+
+    const call = vi.mocked(ctx.api.sendInvoice).mock.calls[0];
+    expect(call[3]).toBe("plan:premium");
+    expect(call[5]).toEqual([{ label: expect.stringContaining("Premium"), amount: 600 }]);
+  });
+
+  it("ignores unknown start payloads and runs normal start flow", async () => {
+    const chat = makeChat({ id: "chat-1", telegramChatId: "12345" });
+    vi.mocked(resetChat).mockResolvedValue(chat);
+
+    const ctx = makeCtx();
+    (ctx as { match?: string }).match = "pay_unknown";
+
+    await handleStart(ctx);
+
+    expect(resetChat).toHaveBeenCalledWith("12345", "supermarket");
+    expect(ctx.replyWithSticker).toHaveBeenCalledOnce();
+  });
 });
 
 // ── handleMessage ────────────────────────────────────────────────────────────

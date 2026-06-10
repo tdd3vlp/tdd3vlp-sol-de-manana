@@ -226,6 +226,18 @@ export async function handleStart(ctx: Context): Promise<void> {
   const telegramChatId = ctx.chat?.id?.toString();
   if (!telegramChatId) return;
 
+  // Deep link from the Web App: t.me/<bot>?start=pay_basic | pay_premium.
+  // sendData does not work for Web Apps opened via menu/inline buttons,
+  // so the Web App redirects here to trigger the Stars invoice.
+  const payload = typeof ctx.match === "string" ? ctx.match.trim() : "";
+  if (payload === "pay_basic" || payload === "pay_premium") {
+    await sendSubscriptionInvoice(
+      ctx,
+      payload.replace("pay_", "") as "basic" | "premium",
+    );
+    return;
+  }
+
   const theme = pickRandomTheme();
   await resetChat(telegramChatId, theme);
 
