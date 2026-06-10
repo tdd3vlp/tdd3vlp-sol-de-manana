@@ -15,7 +15,7 @@ import { callSol, callSolStart, translateToRussian, SolServiceError } from "../l
 import { buildLLMContext } from "../conversation/context.js";
 import { pickRandomTheme, pickRandomThemes, shouldChangeTheme, THEME_LABELS } from "../conversation/themes.js";
 import { isNonsense, isLikelyUnsupported } from "../conversation/language.js";
-import { PLAN_PRICES_STARS } from "../subscription/plans.js";
+import { PLAN_PRICES_STARS, getPlanModel } from "../subscription/plans.js";
 import type { SolResponse } from "../llm/schemas.js";
 
 const botKeyboard = new InlineKeyboard()
@@ -387,10 +387,13 @@ export async function handleTranslate(ctx: Context): Promise<void> {
 
   await ctx.answerCallbackQuery();
 
+  const telegramChatId = ctx.chat?.id?.toString();
+  const chat = telegramChatId ? await getOrCreateChat(telegramChatId, pickRandomTheme()) : null;
+  const model = getPlanModel(chat?.plan ?? "free");
   const textToTranslate = stripCorrectionLine(originalText);
 
   try {
-    const translation = await translateToRussian(textToTranslate);
+    const translation = await translateToRussian(textToTranslate, model);
     await ctx.reply(translation, {
       reply_parameters: { message_id: ctx.callbackQuery!.message!.message_id },
     });

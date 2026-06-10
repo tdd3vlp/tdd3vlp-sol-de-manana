@@ -8,6 +8,16 @@ export const PLAN_LIMITS = {
 
 export type Plan = keyof typeof PLAN_LIMITS;
 
+export const PLAN_MODELS: Record<Plan, string> = {
+  free: "gpt-4o-mini",
+  basic: "gpt-4o",
+  premium: "gpt-4o",
+};
+
+export function getPlanModel(plan: string): string {
+  return PLAN_MODELS[plan as Plan] ?? PLAN_MODELS.free;
+}
+
 export const PLAN_PRICES_STARS: Record<Exclude<Plan, "free">, number> = {
   basic: 150,
   premium: 500,

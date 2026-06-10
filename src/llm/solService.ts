@@ -4,6 +4,7 @@ import { openai } from "./openaiClient.js";
 import { SolResponseSchema, type SolResponse } from "./schemas.js";
 import { buildSystemPrompt, buildStartSystemPrompt } from "../prompts/solSystemPrompt.js";
 import { config } from "../config/env.js";
+import { getPlanModel } from "../subscription/plans.js";
 import type { Chat } from "@prisma/client";
 import type { LLMMessage } from "../conversation/context.js";
 import { isNonsense, isLikelyUnsupported } from "../conversation/language.js";
@@ -16,10 +17,11 @@ export class SolServiceError extends Error {
 }
 
 async function attemptParse(
-  messages: ChatCompletionMessageParam[]
+  messages: ChatCompletionMessageParam[],
+  model: string
 ): Promise<SolResponse> {
   const completion = await openai.beta.chat.completions.parse({
-    model: config.openaiModel,
+    model,
     messages,
     response_format: zodResponseFormat(SolResponseSchema, "sol_response"),
   });
@@ -40,9 +42,9 @@ function hasNullArtifacts(r: SolResponse): boolean {
   return false;
 }
 
-export async function translateToRussian(text: string): Promise<string> {
+export async function translateToRussian(text: string, model: string): Promise<string> {
   const response = await openai.chat.completions.create({
-    model: config.openaiModel,
+    model,
     messages: [
       {
         role: "system",
@@ -59,6 +61,7 @@ export async function translateToRussian(text: string): Promise<string> {
 }
 
 export async function callSolStart(chat: Chat): Promise<SolResponse> {
+  const model = getPlanModel(chat.plan);
   const messages: ChatCompletionMessageParam[] = [
     { role: "system", content: buildStartSystemPrompt(chat.currentTheme) },
     { role: "user", content: "hola" },
@@ -70,7 +73,7 @@ export async function callSolStart(chat: Chat): Promise<SolResponse> {
   });
 
   try {
-    return sanitize(await attemptParse(messages));
+    return sanitize(await attemptParse(messages, model));
   } catch (firstError) {
     console.warn("Start LLM call failed, retrying:", firstError);
     try {
@@ -81,7 +84,7 @@ export async function callSolStart(chat: Chat): Promise<SolResponse> {
           content:
             "Your previous response was invalid. Please respond with valid JSON matching the required schema.",
         },
-      ]));
+      ], model));
     } catch (retryError) {
       console.error("Start LLM service failed after retry:", retryError);
       throw new SolServiceError("Failed to get a valid start response from the language model");
@@ -104,6 +107,7 @@ export async function callSol(
     };
   }
 
+  const model = getPlanModel(chat.plan);
   const baseMessages: ChatCompletionMessageParam[] = [
     { role: "system", content: buildSystemPrompt(chat.currentTheme) },
     ...history.map((m) => ({ role: m.role, content: m.content })),
@@ -111,7 +115,7 @@ export async function callSol(
   ];
 
   try {
-    const first = await attemptParse(baseMessages);
+    const first = await attemptParse(baseMessages, model);
     if (hasNullArtifacts(first)) throw new Error("Semantic validation: null artifacts in response");
     return first;
   } catch (firstError) {
@@ -125,7 +129,7 @@ export async function callSol(
             "Your previous response was invalid. Please respond again with valid JSON that strictly matches the required schema.",
         },
       ];
-      const retry = await attemptParse(repairMessages);
+      const retry = await attemptParse(repairMessages, model);
       if (hasNullArtifacts(retry)) throw new Error("Semantic validation: null artifacts in retry response");
       return retry;
     } catch (retryError) {
