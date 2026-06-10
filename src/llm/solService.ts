@@ -39,6 +39,7 @@ function hasNullArtifacts(r: SolResponse): boolean {
   const nullLine = /(?:^|\n)\s*:?null[,.]?\s*(?:\n|$)/i;
   if (typeof r.correctionOrTranslation === "string" && nullValue.test(r.correctionOrTranslation)) return true;
   if (nullLine.test(r.continuation)) return true;
+  if (typeof r.russianTranslation === "string" && nullValue.test(r.russianTranslation)) return true;
   return false;
 }
 
@@ -130,6 +131,7 @@ export async function callSol(
       inputLanguage: nonsense ? "nonsense" : "unsupported",
       correctionOrTranslation: null,
       continuation: "Por favor, escribe en español o ruso para que podamos continuar.",
+      russianTranslation: null,
       theme: chat.currentTheme,
     };
   }

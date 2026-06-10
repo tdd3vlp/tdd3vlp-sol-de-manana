@@ -15,7 +15,6 @@ import {
 import {
   callSol,
   callSolStart,
-  translateToRussian,
   translateBidirectional,
   SolServiceError,
 } from "../llm/solService.js";
@@ -40,12 +39,12 @@ const WELCOME_STICKER_ID =
   "CAACAgIAAxkBAAIG_GopKYTJ-OV5SI0py5HVx7uUI3kVAAJKngACJo1ISanGJVJBcnbeOwQ";
 
 const BTN_MAIN_MENU = "Главное меню";
+const BTN_TOPIC_MENU = "Выбор темы";
 const BTN_MODE_TRANSLATION = "Режим перевода";
 const BTN_MODE_DIALOGUE = "Режим диалога";
 
 const dialogueReplyKeyboard = new Keyboard()
-  .text(BTN_MAIN_MENU)
-  .text(BTN_MODE_TRANSLATION)
+  .text(BTN_MAIN_MENU).text(BTN_TOPIC_MENU).text(BTN_MODE_TRANSLATION)
   .resized()
   .persistent();
 
@@ -54,11 +53,6 @@ const translationReplyKeyboard = new Keyboard()
   .text(BTN_MODE_DIALOGUE)
   .resized()
   .persistent();
-
-// InlineKeyboard attached to each bot dialogue message
-const botKeyboard = new InlineKeyboard()
-  .text("Выбрать тему", "topic_menu")
-  .text("Перевести 🇷🇺", "translate");
 
 function buildMainMenuKeyboard(): InlineKeyboard {
   return new InlineKeyboard().text("Hola, Sol 👋", "mode_dialogue");
@@ -201,6 +195,15 @@ export function formatForTelegram(text: string): string {
     .replace(/\*\*(.+?)\*\*/g, "<b>$1</b>");
 }
 
+function buildSpoiler(translation: string | null | undefined): string {
+  if (!translation) return "";
+  const escaped = translation
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+  return `\n\n<tg-spoiler>${escaped}</tg-spoiler>`;
+}
+
 // ─── Main menu ────────────────────────────────────────────────────────────────
 
 async function showMainMenu(ctx: Context): Promise<void> {
@@ -257,15 +260,10 @@ async function enterDialogueMode(ctx: Context): Promise<void> {
     await incrementDailyCount(chat.id);
     const rawText = assembleMessage(response);
     await saveMessage(chat.id, "assistant", rawText, JSON.stringify(response));
-    const sent = await ctx.reply(formatForTelegram(rawText), {
-      parse_mode: "HTML",
-      reply_markup: dialogueReplyKeyboard,
-    });
-    // dialogueReplyKeyboard sets the persistent bottom keyboard;
-    // immediately edit to also show inline buttons on this message
-    await ctx.api.editMessageReplyMarkup(ctx.chat!.id, sent.message_id, {
-      reply_markup: botKeyboard,
-    });
+    await ctx.reply(
+      formatForTelegram(rawText) + buildSpoiler(response.russianTranslation),
+      { parse_mode: "HTML", reply_markup: dialogueReplyKeyboard },
+    );
   } catch (error) {
     console.error("enterDialogueMode error:", error);
     await ctx.reply(
@@ -372,11 +370,15 @@ function buildTopicKeyboard(): InlineKeyboard {
   return keyboard;
 }
 
-export async function handleTopicMenu(ctx: Context): Promise<void> {
-  await ctx.answerCallbackQuery();
+async function showTopicMenu(ctx: Context): Promise<void> {
   await ctx.reply("Выбери тему для разговора:", {
     reply_markup: buildTopicKeyboard(),
   });
+}
+
+export async function handleTopicMenu(ctx: Context): Promise<void> {
+  await ctx.answerCallbackQuery();
+  await showTopicMenu(ctx);
 }
 
 export async function handleMoreThemes(ctx: Context): Promise<void> {
@@ -412,10 +414,10 @@ export async function handleTopicCallback(ctx: Context): Promise<void> {
     await incrementDailyCount(chat.id);
     const rawText = assembleMessage(response);
     await saveMessage(chat.id, "assistant", rawText, JSON.stringify(response));
-    await ctx.reply(formatForTelegram(rawText), {
-      parse_mode: "HTML",
-      reply_markup: botKeyboard,
-    });
+    await ctx.reply(
+      formatForTelegram(rawText) + buildSpoiler(response.russianTranslation),
+      { parse_mode: "HTML", reply_markup: dialogueReplyKeyboard },
+    );
   } catch (error) {
     console.error("handleTopicCallback error:", error);
     await ctx.reply(
@@ -474,13 +476,14 @@ export async function handleMessage(ctx: Context): Promise<void> {
     await enterDialogueMode(ctx);
     return;
   }
+  if (userText === BTN_TOPIC_MENU) {
+    await showTopicMenu(ctx);
+    return;
+  }
 
   // Nonsense/unsupported: warn without touching the counter
   if (isNonsense(userText) || isLikelyUnsupported(userText)) {
-    await ctx.reply(formatForTelegram(UNSUPPORTED_WARNING), {
-      parse_mode: "HTML",
-      reply_markup: botKeyboard,
-    });
+    await ctx.reply(UNSUPPORTED_WARNING);
     return;
   }
 
@@ -529,10 +532,10 @@ export async function handleMessage(ctx: Context): Promise<void> {
 
     const rawText = assembleMessage(response, userText);
     await saveMessage(chat.id, "assistant", rawText, JSON.stringify(response));
-    await ctx.reply(formatForTelegram(rawText), {
-      parse_mode: "HTML",
-      reply_markup: botKeyboard,
-    });
+    await ctx.reply(
+      formatForTelegram(rawText) + buildSpoiler(response.russianTranslation),
+      { parse_mode: "HTML", reply_markup: dialogueReplyKeyboard },
+    );
   } catch (error) {
     if (error instanceof SolServiceError) {
       console.error("LLM service error in handleMessage:", error);
@@ -598,44 +601,6 @@ const MEDIA_WARNING =
 
 export async function handleUnsupportedMedia(ctx: Context): Promise<void> {
   await ctx.reply(MEDIA_WARNING);
-}
-
-// ─── Inline translate button ──────────────────────────────────────────────────
-
-function stripCorrectionLine(text: string): string {
-  const paragraphs = text.split("\n\n");
-  const first = paragraphs[0].trimStart();
-  if (/^(Corrección:|En español:)/i.test(first)) {
-    return paragraphs.slice(1).join("\n\n").trim();
-  }
-  return text;
-}
-
-export async function handleTranslate(ctx: Context): Promise<void> {
-  const originalText = ctx.callbackQuery?.message?.text;
-  if (!originalText) {
-    await ctx.answerCallbackQuery({ text: "Текст не найден." });
-    return;
-  }
-
-  await ctx.answerCallbackQuery();
-
-  const telegramChatId = ctx.chat?.id?.toString();
-  const chat = telegramChatId
-    ? await getOrCreateChat(telegramChatId, pickRandomTheme())
-    : null;
-  const model = getPlanModel(chat?.plan ?? "free");
-  const textToTranslate = stripCorrectionLine(originalText);
-
-  try {
-    const translation = await translateToRussian(textToTranslate, model);
-    await ctx.reply(translation, {
-      reply_parameters: { message_id: ctx.callbackQuery!.message!.message_id },
-    });
-  } catch (error) {
-    console.error("Translation error:", error);
-    await ctx.reply("Не удалось перевести. Попробуй ещё раз.");
-  }
 }
 
 // ─── Admin handlers ───────────────────────────────────────────────────────────

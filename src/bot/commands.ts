@@ -2,7 +2,6 @@ import type { Bot } from "grammy";
 import {
   handleStart,
   handleMessage,
-  handleTranslate,
   handleTopicCallback,
   handleTopicMenu,
   handleMoreThemes,
@@ -32,7 +31,6 @@ export function registerCommands(bot: Bot): void {
   bot.on("message:successful_payment", handleSuccessfulPayment);
   bot.on("pre_checkout_query", handlePreCheckout);
   bot.on(["message:voice", "message:video_note", "message:photo", "message:video", "message:audio", "message:sticker", "message:document"], handleUnsupportedMedia);
-  bot.callbackQuery("translate", handleTranslate);
   bot.callbackQuery("continue_dialogue", handleContinueDialogue);
   bot.callbackQuery("topic_menu", handleTopicMenu);
   bot.callbackQuery(/^topic:/, handleTopicCallback);
