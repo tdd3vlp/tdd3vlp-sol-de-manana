@@ -14,6 +14,8 @@ import {
   handleDirectPayCallback,
   handlePreCheckout,
   handleSuccessfulPayment,
+  handleMyId,
+  handleSetPlan,
 } from "./handlers.js";
 
 export function registerCommands(bot: Bot): void {
@@ -21,6 +23,8 @@ export function registerCommands(bot: Bot): void {
   bot.command("tips", handleTips);
   bot.command("help", handleHelp);
   bot.command("subscribe", handleSubscribe);
+  bot.command("myid", handleMyId);
+  bot.command("setplan", handleSetPlan);
   bot.on("message:text", handleMessage);
   bot.on("message:successful_payment", handleSuccessfulPayment);
   bot.on("pre_checkout_query", handlePreCheckout);

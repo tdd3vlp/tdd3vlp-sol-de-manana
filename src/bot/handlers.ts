@@ -15,7 +15,9 @@ import { callSol, callSolStart, translateToRussian, SolServiceError } from "../l
 import { buildLLMContext } from "../conversation/context.js";
 import { pickRandomTheme, pickRandomThemes, shouldChangeTheme, THEME_LABELS } from "../conversation/themes.js";
 import { isNonsense, isLikelyUnsupported } from "../conversation/language.js";
-import { PLAN_PRICES_STARS, getPlanModel } from "../subscription/plans.js";
+import { PLAN_PRICES_STARS, getPlanModel, PLAN_LIMITS } from "../subscription/plans.js";
+import { isAdminUser } from "../subscription/plans.js";
+import { config } from "../config/env.js";
 import type { SolResponse } from "../llm/schemas.js";
 
 const botKeyboard = new InlineKeyboard()
@@ -401,4 +403,30 @@ export async function handleTranslate(ctx: Context): Promise<void> {
     console.error("Translation error:", error);
     await ctx.reply("Не удалось перевести. Попробуй ещё раз.");
   }
+}
+
+export async function handleMyId(ctx: Context): Promise<void> {
+  const chatId = ctx.chat?.id?.toString();
+  if (!chatId) return;
+  await ctx.reply(`Твой Chat ID: \`${chatId}\``, { parse_mode: "MarkdownV2" });
+}
+
+export async function handleSetPlan(ctx: Context): Promise<void> {
+  const adminId = ctx.from?.id?.toString();
+  if (!adminId || !isAdminUser(adminId)) {
+    await ctx.reply("Нет доступа.");
+    return;
+  }
+
+  const args = ctx.message?.text?.split(" ").slice(1);
+  const targetChatId = args?.[0];
+  const plan = args?.[1];
+
+  if (!targetChatId || !plan || !(plan in PLAN_LIMITS)) {
+    await ctx.reply("Использование: /setplan <chatId> <free|basic|premium>");
+    return;
+  }
+
+  await upgradeChatPlan(targetChatId, plan);
+  await ctx.reply(`План для ${targetChatId} изменён на ${plan}.`);
 }
