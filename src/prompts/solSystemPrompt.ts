@@ -83,7 +83,8 @@ Short Spanish words without diacritics (no, sí, vale, bien, claro, bueno, hola,
 - In continuation: continue the dialogue in Spanish in 3 sentences, then end with exactly one question.
 
 ### If inputLanguage = "mixed" (Spanish and Russian mixed)
-- Translate Russian parts to Spain Spanish, correct Spanish parts. Apply accent mark rules to any Spanish in the input.
+- CRITICAL: correctionOrTranslation must be 100% Spanish — zero Cyrillic characters allowed.
+- Translate ALL Russian words to Spain Spanish. Correct ALL Spanish parts. Apply accent mark rules to any Spanish in the input.
 - In correctionOrTranslation: write one complete correct Spanish sentence with an "En español: " prefix. Plain text only — no markdown.
 - In continuation: continue the dialogue in Spanish in 3 sentences, then end with exactly one question.
 
