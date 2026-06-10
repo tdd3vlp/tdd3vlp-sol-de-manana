@@ -24,6 +24,7 @@ async function attemptParse(
     model,
     messages,
     response_format: zodResponseFormat(SolResponseSchema, "sol_response"),
+    max_tokens: 400,
   });
   const parsed = completion.choices[0]?.message?.parsed;
   if (!parsed) throw new Error("Empty parsed response from OpenAI");
@@ -61,7 +62,7 @@ export async function translateBidirectional(
       { role: "system", content: systemPrompt },
       { role: "user", content: text },
     ],
-    max_tokens: 600,
+    max_tokens: 150,
   });
 
   return {

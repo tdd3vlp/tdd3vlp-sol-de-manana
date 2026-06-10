@@ -328,6 +328,13 @@ async function handleTranslationInput(
     return;
   }
 
+  if (userText.length > 500) {
+    await ctx.reply(
+      "Текст слишком длинный. Пожалуйста, отправь не более 3–4 предложений.",
+    );
+    return;
+  }
+
   const model = getPlanModel(chat.plan);
   try {
     const { translation, direction } = await translateBidirectional(
@@ -465,6 +472,13 @@ export async function handleMessage(ctx: Context): Promise<void> {
   }
   if (userText === BTN_TOPIC_MENU) {
     await showTopicMenu(ctx);
+    return;
+  }
+
+  if (userText.length > 350) {
+    await ctx.reply(
+      "Сообщение слишком длинное. Пожалуйста, напиши не более 3–4 предложений.",
+    );
     return;
   }
 
