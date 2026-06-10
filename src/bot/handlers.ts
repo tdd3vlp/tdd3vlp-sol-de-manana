@@ -69,7 +69,7 @@ const HELP =
 function meaningful(s: string | null): s is string {
   if (!s) return false;
   const t = s.trim().toLowerCase();
-  return t.length > 1 && t !== "null" && !/^:?null[,.:;]?\s*$/.test(t);
+  return t.length > 1 && t !== "null" && !/^:?null[,.:;]?\s*$/.test(t) && /[a-záéíóúüñа-яёА-ЯЁ]/i.test(t);
 }
 
 function sanitizeNullTokens(s: string): string {
