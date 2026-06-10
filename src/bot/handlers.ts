@@ -38,18 +38,16 @@ import type { SolResponse } from "../llm/schemas.js";
 const WELCOME_STICKER_ID =
   "CAACAgIAAxkBAAIG_GopKYTJ-OV5SI0py5HVx7uUI3kVAAJKngACJo1ISanGJVJBcnbeOwQ";
 
-const BTN_MAIN_MENU = "Главное меню";
 const BTN_TOPIC_MENU = "Выбор темы";
 const BTN_MODE_TRANSLATION = "Режим перевода";
 const BTN_MODE_DIALOGUE = "Режим диалога";
 
 const dialogueReplyKeyboard = new Keyboard()
-  .text(BTN_MAIN_MENU).text(BTN_TOPIC_MENU).text(BTN_MODE_TRANSLATION)
+  .text(BTN_TOPIC_MENU).text(BTN_MODE_TRANSLATION)
   .resized()
   .persistent();
 
 const translationReplyKeyboard = new Keyboard()
-  .text(BTN_MAIN_MENU)
   .text(BTN_MODE_DIALOGUE)
   .resized()
   .persistent();
@@ -206,14 +204,6 @@ function buildSpoiler(translation: string | null | undefined): string {
 
 // ─── Main menu ────────────────────────────────────────────────────────────────
 
-async function showMainMenu(ctx: Context): Promise<void> {
-  const firstName = ctx.from?.first_name ?? "друг";
-  await ctx.reply(
-    `Привет, ${firstName}! Я Sol, твой друг в изучении испанского языка.`,
-    { reply_markup: buildMainMenuKeyboard() },
-  );
-}
-
 export async function handleStart(ctx: Context): Promise<void> {
   const telegramChatId = ctx.chat?.id?.toString();
   if (!telegramChatId) return;
@@ -228,11 +218,6 @@ export async function handleStart(ctx: Context): Promise<void> {
     `Привет, ${firstName}! Я Sol, твой друг в изучении испанского языка.`,
     { reply_markup: buildMainMenuKeyboard() },
   );
-}
-
-export async function handleMainMenuCallback(ctx: Context): Promise<void> {
-  await ctx.answerCallbackQuery();
-  await showMainMenu(ctx);
 }
 
 // ─── Dialogue mode ────────────────────────────────────────────────────────────
@@ -436,22 +421,20 @@ export async function handleContinueDialogue(ctx: Context): Promise<void> {
 }
 
 export async function handleTips(ctx: Context): Promise<void> {
-  const backButton = new InlineKeyboard().text("← Главное меню", "main_menu");
-  await ctx.reply(TIPS, { reply_markup: backButton });
+  await ctx.reply(TIPS);
 }
 
 export async function handleTipsCallback(ctx: Context): Promise<void> {
   await ctx.answerCallbackQuery();
-  const backButton = new InlineKeyboard().text("← Главное меню", "main_menu");
-  await ctx.reply(TIPS, { reply_markup: backButton });
+  await ctx.reply(TIPS);
 }
 
 export async function handleHelp(ctx: Context): Promise<void> {
   await ctx.reply(HELP, {
-    reply_markup: new InlineKeyboard()
-      .url("Связаться с менеджером", "https://t.me/tdd3vlp")
-      .row()
-      .text("Главное меню", "main_menu"),
+    reply_markup: new InlineKeyboard().url(
+      "Связаться с менеджером",
+      "https://t.me/tdd3vlp",
+    ),
   });
 }
 
@@ -464,10 +447,6 @@ export async function handleMessage(ctx: Context): Promise<void> {
   if (!telegramChatId || !userText) return;
 
   // Intercept persistent keyboard nav buttons before any other processing
-  if (userText === BTN_MAIN_MENU) {
-    await showMainMenu(ctx);
-    return;
-  }
   if (userText === BTN_MODE_TRANSLATION) {
     await enterTranslationMode(ctx);
     return;
