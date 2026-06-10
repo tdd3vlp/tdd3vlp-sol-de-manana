@@ -40,8 +40,8 @@ const WELCOME_STICKER_ID =
   "CAACAgIAAxkBAAIG_GopKYTJ-OV5SI0py5HVx7uUI3kVAAJKngACJo1ISanGJVJBcnbeOwQ";
 
 const BTN_MAIN_MENU = "🏠 Главное меню";
-const BTN_MODE_TRANSLATION = "🔄 Режим перевода";
-const BTN_MODE_DIALOGUE = "💬 Режим диалога";
+const BTN_MODE_TRANSLATION = "Режим перевода 🔄";
+const BTN_MODE_DIALOGUE = "Режим диалога 💬";
 
 const dialogueReplyKeyboard = new Keyboard()
   .text(BTN_MAIN_MENU)
@@ -62,9 +62,9 @@ const botKeyboard = new InlineKeyboard()
 
 function buildMainMenuKeyboard(): InlineKeyboard {
   return new InlineKeyboard()
-    .text("💬 Режим диалога", "mode_dialogue")
+    .text("Режим диалога 💬", "mode_dialogue")
     .row()
-    .text("🔄 Режим перевода", "mode_translation");
+    .text("Режим перевода 🔄", "mode_translation");
 }
 
 function buildSubscribeKeyboard(): InlineKeyboard {
