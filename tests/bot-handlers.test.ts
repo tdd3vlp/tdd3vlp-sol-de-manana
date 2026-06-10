@@ -54,7 +54,13 @@ import {
 } from "../src/db/chatHistory.js";
 import { callSol, callSolStart, SolServiceError } from "../src/llm/solService.js";
 import { shouldChangeTheme } from "../src/conversation/themes.js";
-import { handleStart, handleMessage, handleUnsupportedMedia } from "../src/bot/handlers.js";
+import {
+  handleStart,
+  handleMessage,
+  handleUnsupportedMedia,
+  handleSuccessfulPayment,
+} from "../src/bot/handlers.js";
+import { upgradeChatPlan } from "../src/db/chatHistory.js";
 
 function makeCtx(opts: { chatId?: number; text?: string } = {}): Context {
   return {
@@ -156,31 +162,38 @@ describe("handleStart", () => {
     expect(ctx.reply).not.toHaveBeenCalled();
   });
 
-  it("sends a Stars invoice for pay_basic deep link without resetting chat", async () => {
+  it("sends a Stars subscription invoice link for pay_basic deep link without resetting chat", async () => {
     const ctx = makeCtx();
     (ctx as { match?: string }).match = "pay_basic";
-    (ctx as { api?: unknown }).api = { sendInvoice: vi.fn().mockResolvedValue({}) };
+    (ctx as { api?: unknown }).api = {
+      createInvoiceLink: vi.fn().mockResolvedValue("https://t.me/$invoice"),
+    };
 
     await handleStart(ctx);
 
     expect(resetChat).not.toHaveBeenCalled();
     expect(ctx.replyWithSticker).not.toHaveBeenCalled();
-    const call = vi.mocked(ctx.api.sendInvoice).mock.calls[0];
-    expect(call[0]).toBe(12345);
-    expect(call[3]).toBe("plan:basic");
+    const call = vi.mocked(ctx.api.createInvoiceLink).mock.calls[0];
+    expect(call[2]).toBe("plan:basic");
     expect(call[4]).toBe("XTR");
     expect(call[5]).toEqual([{ label: expect.stringContaining("Basic"), amount: 200 }]);
+    expect(call[6]).toEqual({ subscription_period: 2592000 });
+    const reply = vi.mocked(ctx.reply).mock.calls[0];
+    expect(reply[0]).toContain("автопродлением");
+    expect(JSON.stringify(reply[1])).toContain("https://t.me/$invoice");
   });
 
-  it("sends a Stars invoice for pay_premium deep link", async () => {
+  it("sends a Stars subscription invoice link for pay_premium deep link", async () => {
     const ctx = makeCtx();
     (ctx as { match?: string }).match = "pay_premium";
-    (ctx as { api?: unknown }).api = { sendInvoice: vi.fn().mockResolvedValue({}) };
+    (ctx as { api?: unknown }).api = {
+      createInvoiceLink: vi.fn().mockResolvedValue("https://t.me/$invoice"),
+    };
 
     await handleStart(ctx);
 
-    const call = vi.mocked(ctx.api.sendInvoice).mock.calls[0];
-    expect(call[3]).toBe("plan:premium");
+    const call = vi.mocked(ctx.api.createInvoiceLink).mock.calls[0];
+    expect(call[2]).toBe("plan:premium");
     expect(call[5]).toEqual([{ label: expect.stringContaining("Premium"), amount: 600 }]);
   });
 
@@ -195,6 +208,64 @@ describe("handleStart", () => {
 
     expect(resetChat).toHaveBeenCalledWith("12345", "supermarket");
     expect(ctx.replyWithSticker).toHaveBeenCalledOnce();
+  });
+});
+
+// ── handleSuccessfulPayment ──────────────────────────────────────────────────
+
+function makePaymentCtx(payment: Record<string, unknown>): Context {
+  return {
+    chat: { id: 12345 },
+    message: { successful_payment: payment },
+    reply: vi.fn().mockResolvedValue({}),
+  } as unknown as Context;
+}
+
+describe("handleSuccessfulPayment", () => {
+  it("upgrades plan with expiry from subscription_expiration_date", async () => {
+    const exp = Math.floor(Date.now() / 1000) + 2592000;
+    const ctx = makePaymentCtx({
+      invoice_payload: "plan:basic",
+      subscription_expiration_date: exp,
+      is_recurring: true,
+      is_first_recurring: true,
+    });
+
+    await handleSuccessfulPayment(ctx);
+
+    expect(upgradeChatPlan).toHaveBeenCalledWith("12345", "basic", new Date(exp * 1000));
+    expect(vi.mocked(ctx.reply).mock.calls[0][0]).toContain("активирована");
+  });
+
+  it("sends renewal confirmation and extends expiry on auto-renewal", async () => {
+    const exp = Math.floor(Date.now() / 1000) + 2592000;
+    const ctx = makePaymentCtx({
+      invoice_payload: "plan:premium",
+      subscription_expiration_date: exp,
+      is_recurring: true,
+    });
+
+    await handleSuccessfulPayment(ctx);
+
+    expect(upgradeChatPlan).toHaveBeenCalledWith("12345", "premium", new Date(exp * 1000));
+    expect(vi.mocked(ctx.reply).mock.calls[0][0]).toContain("продлена");
+  });
+
+  it("stores no expiry for legacy one-time payments", async () => {
+    const ctx = makePaymentCtx({ invoice_payload: "plan:basic" });
+
+    await handleSuccessfulPayment(ctx);
+
+    expect(upgradeChatPlan).toHaveBeenCalledWith("12345", "basic", null);
+  });
+
+  it("ignores unknown payloads", async () => {
+    const ctx = makePaymentCtx({ invoice_payload: "something:else" });
+
+    await handleSuccessfulPayment(ctx);
+
+    expect(upgradeChatPlan).not.toHaveBeenCalled();
+    expect(ctx.reply).not.toHaveBeenCalled();
   });
 });
 

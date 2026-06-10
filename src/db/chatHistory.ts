@@ -58,9 +58,23 @@ export async function checkAndMaybeReset(
   }
 
   let current = chat;
-  if (isNewDay(chat.dailyResetAt)) {
+
+  // Paid plan expired (Stars subscription cancelled or renewal failed) → free.
+  // planExpiresAt = null means no expiry (free plan or admin-granted via /setplan).
+  if (
+    current.plan !== "free" &&
+    current.planExpiresAt &&
+    current.planExpiresAt < new Date()
+  ) {
     current = await prisma.chat.update({
-      where: { id: chat.id },
+      where: { id: current.id },
+      data: { plan: "free", planExpiresAt: null },
+    });
+  }
+
+  if (isNewDay(current.dailyResetAt)) {
+    current = await prisma.chat.update({
+      where: { id: current.id },
       data: { dailyMessageCount: 0, dailyResetAt: new Date() },
     });
   }
@@ -97,11 +111,12 @@ export async function updateChatThemeAndLock(
 
 export async function upgradeChatPlan(
   telegramChatId: string,
-  plan: string
+  plan: string,
+  expiresAt: Date | null = null
 ): Promise<Chat> {
   return prisma.chat.update({
     where: { telegramChatId },
-    data: { plan },
+    data: { plan, planExpiresAt: expiresAt },
   });
 }
 

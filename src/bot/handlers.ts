@@ -88,6 +88,9 @@ async function sendPaywall(ctx: Context, plan = "free"): Promise<void> {
   }
 }
 
+// The only subscription period Telegram allows: 30 days.
+const SUBSCRIPTION_PERIOD_SECONDS = 2592000;
+
 async function sendSubscriptionInvoice(
   ctx: Context,
   plan: "basic" | "premium",
@@ -97,13 +100,19 @@ async function sendSubscriptionInvoice(
     premium: "Premium — 300 сообщений в день",
   };
   const stars = PLAN_PRICES_STARS[plan];
-  await ctx.api.sendInvoice(
-    ctx.chat!.id,
+  // sendInvoice does not support subscriptions, so we go through an invoice link
+  const link = await ctx.api.createInvoiceLink(
     labels[plan],
-    "Доступ к Sol de Mañana",
+    "Подписка Sol de Mañana на 30 дней с автопродлением",
     `plan:${plan}`,
+    "",
     "XTR",
     [{ label: labels[plan], amount: stars }],
+    { subscription_period: SUBSCRIPTION_PERIOD_SECONDS },
+  );
+  await ctx.reply(
+    `${labels[plan]} — ${stars} ⭐ в месяц с автопродлением.\nОтменить подписку можно в любой момент в настройках Telegram.`,
+    { reply_markup: new InlineKeyboard().url(`Оплатить ${stars} ⭐`, link) },
   );
 }
 
@@ -695,22 +704,33 @@ export async function handlePreCheckout(ctx: Context): Promise<void> {
 }
 
 export async function handleSuccessfulPayment(ctx: Context): Promise<void> {
-  const payload = ctx.message?.successful_payment?.invoice_payload;
+  const payment = ctx.message?.successful_payment;
+  const payload = payment?.invoice_payload;
   const telegramChatId = ctx.chat?.id?.toString();
-  if (!payload || !telegramChatId) return;
+  if (!payment || !payload || !telegramChatId) return;
 
   if (!payload.startsWith("plan:")) return;
   const plan = payload.replace("plan:", "");
   if (plan !== "basic" && plan !== "premium") return;
 
-  await upgradeChatPlan(telegramChatId, plan);
+  // Telegram sends successful_payment for the initial purchase and for every
+  // auto-renewal; subscription_expiration_date moves forward each cycle.
+  const expiresAt = payment.subscription_expiration_date
+    ? new Date(payment.subscription_expiration_date * 1000)
+    : null;
+  await upgradeChatPlan(telegramChatId, plan, expiresAt);
 
+  const isRenewal = payment.is_recurring && !payment.is_first_recurring;
   const confirmations: Record<string, string> = {
     basic: "Подписка Basic активирована. Теперь у тебя 100 сообщений в день.",
     premium:
       "Подписка Premium активирована. Теперь у тебя 300 сообщений в день.",
   };
-  await ctx.reply(confirmations[plan] ?? "Подписка активирована.");
+  await ctx.reply(
+    isRenewal
+      ? `Подписка ${plan === "basic" ? "Basic" : "Premium"} продлена на месяц.`
+      : confirmations[plan] ?? "Подписка активирована.",
+  );
 }
 
 const MEDIA_WARNING =

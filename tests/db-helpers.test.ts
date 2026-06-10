@@ -31,6 +31,7 @@ const mockChat = {
   currentTheme: "supermarket",
   themeReplyCount: 3,
   plan: "free",
+  planExpiresAt: null,
   mode: "dialogue",
   lockTheme: false,
   dailyMessageCount: 0,

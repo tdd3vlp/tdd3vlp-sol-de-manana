@@ -417,13 +417,25 @@
           tg ? tg.close() : window.close();
           return;
         }
-        // sendData only works for Web Apps opened from a reply keyboard,
-        // so payment goes through a /start deep link to the bot.
         const plan = action.replace("pay:", "");
+        // Reusable Stars subscription invoice links (30 days, auto-renew),
+        // created once via createInvoiceLink.
+        const invoiceLinks = {
+          basic: "https://t.me/$VqZG4N3PUUl5GAAAY9rDt4JlueY",
+          premium: "https://t.me/$agEqnt3PUUl6GAAAhqTPklvmbaI",
+        };
+        if (tg && typeof tg.openInvoice === "function") {
+          // Payment sheet opens inside the Mini App on every platform,
+          // including the macOS client where /start deep links are unreliable.
+          tg.openInvoice(invoiceLinks[plan], (status) => {
+            if (status === "paid") tg.close();
+          });
+          return;
+        }
+        // Fallback for old clients: /start deep link → bot sends the invoice.
         const payLink = "https://t.me/soldemanana_bot?start=pay_" + plan;
         if (tg) {
           tg.openTelegramLink(payLink);
-          tg.close();
         } else {
           window.open(payLink, "_blank");
         }

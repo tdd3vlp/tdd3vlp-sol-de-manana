@@ -13,6 +13,7 @@ model Chat {
   currentTheme      String
   themeReplyCount   Int       @default(0)
   plan              String    @default("free")
+  planExpiresAt     DateTime?
   mode              String    @default("dialogue")
   lockTheme         Boolean   @default(false)
   dailyMessageCount Int       @default(0)

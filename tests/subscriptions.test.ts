@@ -151,6 +151,60 @@ describe("checkAndMaybeReset", () => {
     await checkAndMaybeReset(chat, "12345");
     expect(prisma.chat.update).not.toHaveBeenCalled();
   });
+
+  it("downgrades to free when paid plan has expired", async () => {
+    const expired = new Date(Date.now() - 60 * 60 * 1000);
+    const chat = makeChat({
+      plan: "basic",
+      planExpiresAt: expired,
+      dailyMessageCount: 50,
+      dailyResetAt: new Date(),
+    });
+    vi.mocked(prisma.chat.update).mockResolvedValue({
+      ...chat,
+      plan: "free",
+      planExpiresAt: null,
+    });
+
+    const result = await checkAndMaybeReset(chat, "12345");
+
+    expect(prisma.chat.update).toHaveBeenCalledWith({
+      where: { id: chat.id },
+      data: { plan: "free", planExpiresAt: null },
+    });
+    // 50 messages is over the free limit of 10
+    expect(result.allowed).toBe(false);
+    expect(result.chat.plan).toBe("free");
+  });
+
+  it("keeps paid plan while subscription is active", async () => {
+    const future = new Date(Date.now() + 10 * 24 * 60 * 60 * 1000);
+    const chat = makeChat({
+      plan: "basic",
+      planExpiresAt: future,
+      dailyMessageCount: 50,
+      dailyResetAt: new Date(),
+    });
+
+    const result = await checkAndMaybeReset(chat, "12345");
+
+    expect(prisma.chat.update).not.toHaveBeenCalled();
+    expect(result.allowed).toBe(true);
+  });
+
+  it("treats null planExpiresAt as non-expiring (admin-granted plan)", async () => {
+    const chat = makeChat({
+      plan: "premium",
+      planExpiresAt: null,
+      dailyMessageCount: 200,
+      dailyResetAt: new Date(),
+    });
+
+    const result = await checkAndMaybeReset(chat, "12345");
+
+    expect(prisma.chat.update).not.toHaveBeenCalled();
+    expect(result.allowed).toBe(true);
+  });
 });
 
 // ── incrementDailyCount ───────────────────────────────────────────────────────
