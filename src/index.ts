@@ -10,12 +10,13 @@ bot.catch((err) => {
   console.error("Bot error:", err.error);
 });
 
-bot.api.setMyCommands([
-  { command: "start", description: "Начать или перезапустить сессию" },
-  { command: "subscribe", description: "Управление подпиской" },
-  { command: "tips", description: "Советы по работе с ботом" },
-  { command: "help", description: "Связаться с менеджером" },
-]);
+if (config.webAppUrl) {
+  bot.api.setChatMenuButton({
+    menu_button: { type: "web_app", text: "Sol de Mañana", web_app: { url: config.webAppUrl } },
+  });
+} else {
+  bot.api.setMyCommands([]);
+}
 
 bot.start();
 console.log("Sol de Mañana is running...");
