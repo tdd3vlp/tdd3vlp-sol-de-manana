@@ -60,15 +60,31 @@ export async function getRecentMessages(
   return messages.reverse();
 }
 
-export async function updateChatTheme(
+// One transaction for the whole delivered turn: dialogue state
+// (currentTheme/themeReplyCount) and the user/assistant pair land together
+// or not at all, so theme progress can never drift from history.
+export async function saveTurn(
   chatId: string,
   theme: string,
-  count: number
-): Promise<Chat> {
-  return prisma.chat.update({
-    where: { id: chatId },
-    data: { currentTheme: theme, themeReplyCount: count },
-  });
+  count: number,
+  entries: NewMessage[]
+): Promise<void> {
+  await prisma.$transaction([
+    prisma.chat.update({
+      where: { id: chatId },
+      data: { currentTheme: theme, themeReplyCount: count },
+    }),
+    ...entries.map((entry) =>
+      prisma.message.create({
+        data: {
+          chatId,
+          role: entry.role,
+          text: entry.text,
+          llmJson: entry.llmJson,
+        },
+      })
+    ),
+  ]);
 }
 
 export interface ConsumeResult {

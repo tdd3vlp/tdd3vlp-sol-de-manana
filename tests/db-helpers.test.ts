@@ -22,7 +22,7 @@ import {
   getOrCreateChat,
   saveMessages,
   getRecentMessages,
-  updateChatTheme,
+  saveTurn,
   resetChat,
 } from "../src/db/chatHistory.js";
 
@@ -132,18 +132,31 @@ describe("getRecentMessages", () => {
   });
 });
 
-describe("updateChatTheme", () => {
-  it("updates theme and count", async () => {
+describe("saveTurn", () => {
+  it("writes theme state and the message pair in one transaction", async () => {
     vi.mocked(prisma.chat.update).mockResolvedValue({
       ...mockChat,
       currentTheme: "cafe or restaurant",
       themeReplyCount: 0,
     });
-    await updateChatTheme("chat-1", "cafe or restaurant", 0);
+    vi.mocked(prisma.message.create).mockResolvedValue(mockMessage);
+
+    await saveTurn("chat-1", "cafe or restaurant", 0, [
+      { role: "user", text: "Hola" },
+      { role: "assistant", text: "Buenas.", llmJson: "{}" },
+    ]);
+
     expect(prisma.chat.update).toHaveBeenCalledWith({
       where: { id: "chat-1" },
       data: { currentTheme: "cafe or restaurant", themeReplyCount: 0 },
     });
+    expect(prisma.message.create).toHaveBeenCalledWith({
+      data: { chatId: "chat-1", role: "user", text: "Hola", llmJson: undefined },
+    });
+    expect(prisma.message.create).toHaveBeenCalledWith({
+      data: { chatId: "chat-1", role: "assistant", text: "Buenas.", llmJson: "{}" },
+    });
+    expect(prisma.$transaction).toHaveBeenCalledOnce();
   });
 });
 

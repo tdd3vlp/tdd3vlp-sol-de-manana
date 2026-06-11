@@ -5,7 +5,7 @@ import {
   getOrCreateChat,
   saveMessages,
   getRecentMessages,
-  updateChatTheme,
+  saveTurn,
   updateChatThemeAndLock,
   updateChatMode,
   resetChat,
@@ -282,6 +282,22 @@ async function saveDeliveredMessages(
     await saveMessages(chatId, entries);
   } catch (error) {
     console.error("Failed to persist delivered messages:", error);
+  }
+}
+
+// Same delivery contract as saveDeliveredMessages, for turns that also
+// advance dialogue state (theme/count): one transaction underneath, so
+// state and history can never drift apart.
+async function saveDeliveredTurn(
+  chatId: string,
+  theme: string,
+  count: number,
+  entries: NewMessage[],
+): Promise<void> {
+  try {
+    await saveTurn(chatId, theme, count, entries);
+  } catch (error) {
+    console.error("Failed to persist delivered turn:", error);
   }
 }
 
@@ -730,16 +746,7 @@ export async function handleMessage(ctx: Context): Promise<void> {
     await replyWithSpoilerTranslation(ctx, rawText, response);
     // The background spoiler edit is not part of critical delivery.
 
-    // Dialogue state advances only after the user saw the reply, and — like
-    // saveDeliveredMessages — its failure must not reach the apology/refund
-    // catch: the answer is already delivered.
-    try {
-      await updateChatTheme(chat.id, currentTheme, newCount);
-    } catch (error) {
-      console.error("Failed to update theme after delivery:", error);
-    }
-
-    await saveDeliveredMessages(chat.id, [
+    await saveDeliveredTurn(chat.id, currentTheme, newCount, [
       { role: "user", text: userText },
       { role: "assistant", text: rawText, llmJson: JSON.stringify(response) },
     ]);

@@ -20,7 +20,7 @@ vi.mock("../src/db/chatHistory.js", () => ({
   getOrCreateChat: vi.fn(),
   saveMessages: vi.fn(),
   getRecentMessages: vi.fn(),
-  updateChatTheme: vi.fn(),
+  saveTurn: vi.fn(),
   updateChatMode: vi.fn(),
   resetChat: vi.fn(),
   consumeDailyMessage: vi.fn(),
@@ -60,7 +60,7 @@ import {
   getOrCreateChat,
   saveMessages,
   getRecentMessages,
-  updateChatTheme,
+  saveTurn,
   resetChat,
   consumeDailyMessage,
   refundDailyMessage,
@@ -378,7 +378,6 @@ describe("handleMessage", () => {
   it("saves user message, calls LLM, saves assistant message, and replies", async () => {
     const chat = makeChat();
     vi.mocked(getOrCreateChat).mockResolvedValue(chat);
-    vi.mocked(updateChatTheme).mockResolvedValue({ ...chat, themeReplyCount: 1 });
     vi.mocked(callSol).mockResolvedValue(
       makeSolResponse({ continuation: "Interesante. ¿Y tú?" })
     );
@@ -387,8 +386,8 @@ describe("handleMessage", () => {
     await handleMessage(ctx);
 
     expect(callSol).toHaveBeenCalledOnce();
-    // The delivered pair is persisted atomically in a single call
-    expect(saveMessages).toHaveBeenCalledWith(chat.id, [
+    // Dialogue state and the delivered pair are persisted in a single call
+    expect(saveTurn).toHaveBeenCalledWith(chat.id, chat.currentTheme, 1, [
       { role: "user", text: "Me gusta España." },
       {
         role: "assistant",
@@ -402,7 +401,6 @@ describe("handleMessage", () => {
   it("edits the russian spoiler into the reply in the background", async () => {
     const chat = makeChat();
     vi.mocked(getOrCreateChat).mockResolvedValue(chat);
-    vi.mocked(updateChatTheme).mockResolvedValue({ ...chat, themeReplyCount: 1 });
     vi.mocked(callSol).mockResolvedValue(
       makeSolResponse({ continuation: "Interesante. ¿Y tú?" })
     );
@@ -426,25 +424,33 @@ describe("handleMessage", () => {
     vi.mocked(shouldChangeTheme).mockReturnValue(false);
     const chat = makeChat({ themeReplyCount: 2, currentTheme: "supermarket" });
     vi.mocked(getOrCreateChat).mockResolvedValue(chat);
-    vi.mocked(updateChatTheme).mockResolvedValue({ ...chat, themeReplyCount: 3 });
     vi.mocked(callSol).mockResolvedValue(makeSolResponse());
 
     await handleMessage(makeCtx());
 
-    expect(updateChatTheme).toHaveBeenCalledWith(chat.id, "supermarket", 3);
+    expect(saveTurn).toHaveBeenCalledWith(
+      chat.id,
+      "supermarket",
+      3,
+      expect.any(Array)
+    );
   });
 
   it("resets count to 0 and picks new theme when shouldChangeTheme is true", async () => {
     vi.mocked(shouldChangeTheme).mockReturnValue(true);
     const chat = makeChat({ themeReplyCount: 8, currentTheme: "supermarket" });
     vi.mocked(getOrCreateChat).mockResolvedValue(chat);
-    vi.mocked(updateChatTheme).mockResolvedValue({ ...chat, currentTheme: "supermarket", themeReplyCount: 0 });
     vi.mocked(callSol).mockResolvedValue(makeSolResponse());
 
     await handleMessage(makeCtx());
 
     // Count resets to 0; theme changes to whatever pickRandomTheme returns ("supermarket" in mock)
-    expect(updateChatTheme).toHaveBeenCalledWith(chat.id, "supermarket", 0);
+    expect(saveTurn).toHaveBeenCalledWith(
+      chat.id,
+      "supermarket",
+      0,
+      expect.any(Array)
+    );
   });
 
   it("sends LLM fallback message on SolServiceError", async () => {
@@ -458,7 +464,7 @@ describe("handleMessage", () => {
       expect.stringContaining("inténtalo")
     );
     // No orphan user message must remain in history after an LLM failure
-    expect(saveMessages).not.toHaveBeenCalled();
+    expect(saveTurn).not.toHaveBeenCalled();
     // The failed message must be refunded to the daily limit
     expect(refundDailyMessage).toHaveBeenCalled();
   });
@@ -466,7 +472,6 @@ describe("handleMessage", () => {
   it("does not save history when telegram delivery fails", async () => {
     const chat = makeChat();
     vi.mocked(getOrCreateChat).mockResolvedValue(chat);
-    vi.mocked(updateChatTheme).mockResolvedValue({ ...chat, themeReplyCount: 1 });
     vi.mocked(callSol).mockResolvedValue(makeSolResponse());
 
     const ctx = makeCtx();
@@ -477,8 +482,7 @@ describe("handleMessage", () => {
 
     // History must not contain a reply the user never saw, and dialogue
     // state must not advance past it either
-    expect(saveMessages).not.toHaveBeenCalled();
-    expect(updateChatTheme).not.toHaveBeenCalled();
+    expect(saveTurn).not.toHaveBeenCalled();
     expect(refundDailyMessage).toHaveBeenCalled();
   });
 
@@ -495,14 +499,12 @@ describe("handleMessage", () => {
     // The warning is delivered, but the exchange is not part of the dialogue
     expect(ctx.reply).toHaveBeenCalledOnce();
     expect(refundDailyMessage).toHaveBeenCalledOnce();
-    expect(updateChatTheme).not.toHaveBeenCalled();
-    expect(saveMessages).not.toHaveBeenCalled();
+    expect(saveTurn).not.toHaveBeenCalled();
   });
 
   it("refunds only once when unsupported input is followed by a delivery failure", async () => {
     const chat = makeChat();
     vi.mocked(getOrCreateChat).mockResolvedValue(chat);
-    vi.mocked(updateChatTheme).mockResolvedValue({ ...chat, themeReplyCount: 1 });
     vi.mocked(callSol).mockResolvedValue(
       makeSolResponse({ inputLanguage: "unsupported" })
     );
@@ -519,9 +521,8 @@ describe("handleMessage", () => {
   it("does not apologize or refund when only persistence fails after delivery", async () => {
     const chat = makeChat();
     vi.mocked(getOrCreateChat).mockResolvedValue(chat);
-    vi.mocked(updateChatTheme).mockResolvedValue({ ...chat, themeReplyCount: 1 });
     vi.mocked(callSol).mockResolvedValue(makeSolResponse());
-    vi.mocked(saveMessages).mockRejectedValue(new Error("db down"));
+    vi.mocked(saveTurn).mockRejectedValue(new Error("db down"));
 
     const ctx = makeCtx();
     await handleMessage(ctx);
