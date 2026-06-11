@@ -668,11 +668,6 @@ export async function handleMessage(ctx: Context): Promise<void> {
       getPlanModel(getEffectivePlan(chat), telegramUserId),
     );
 
-    // Persist the user message only after a successful LLM response —
-    // otherwise a failed call leaves an unanswered message in history and
-    // the next request gets a broken context.
-    await saveMessage(chat.id, "user", userText);
-
     // Unsupported/nonsense input does not count against the daily limit
     if (
       consumed &&
@@ -693,8 +688,14 @@ export async function handleMessage(ctx: Context): Promise<void> {
     chat = await updateChatTheme(chat.id, currentTheme, newCount);
 
     const rawText = assembleMessage(response, userText);
-    await saveMessage(chat.id, "assistant", rawText, JSON.stringify(response));
     await replyWithSpoilerTranslation(ctx, rawText, response);
+
+    // Persist the pair only after the reply is delivered: a failed LLM call
+    // or a failed Telegram send must not leave messages in history that the
+    // user never saw — the next LLM context would treat them as answered.
+    // The background spoiler edit is not part of critical delivery.
+    await saveMessage(chat.id, "user", userText);
+    await saveMessage(chat.id, "assistant", rawText, JSON.stringify(response));
   } catch (error) {
     if (consumed) await refundDailyMessage(chat.id);
     if (error instanceof SolServiceError) {

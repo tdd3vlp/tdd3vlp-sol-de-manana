@@ -438,6 +438,23 @@ describe("handleMessage", () => {
     expect(refundDailyMessage).toHaveBeenCalled();
   });
 
+  it("does not save history when telegram delivery fails", async () => {
+    const chat = makeChat();
+    vi.mocked(getOrCreateChat).mockResolvedValue(chat);
+    vi.mocked(updateChatTheme).mockResolvedValue({ ...chat, themeReplyCount: 1 });
+    vi.mocked(callSol).mockResolvedValue(makeSolResponse());
+
+    const ctx = makeCtx();
+    // The dialogue reply fails; the apology in the catch block goes through.
+    vi.mocked(ctx.reply).mockRejectedValueOnce(new Error("telegram down"));
+
+    await handleMessage(ctx);
+
+    // History must not contain a reply the user never saw
+    expect(saveMessage).not.toHaveBeenCalled();
+    expect(refundDailyMessage).toHaveBeenCalled();
+  });
+
   it("does nothing when message text is missing", async () => {
     const ctx = {
       chat: { id: 1 },
