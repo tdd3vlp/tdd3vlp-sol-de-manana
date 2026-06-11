@@ -321,7 +321,7 @@ describe("handleDirectPayCallback", () => {
     expect(ctx.api.sendInvoice).toHaveBeenCalledWith(
       12345,
       expect.stringContaining("Premium"),
-      expect.stringContaining("СБП"),
+      expect.stringContaining("СберПэй"),
       "plan:premium:yookassa",
       "RUB",
       [{ label: expect.stringContaining("Premium"), amount: 89900 }],
