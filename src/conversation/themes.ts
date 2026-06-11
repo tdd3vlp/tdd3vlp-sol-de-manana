@@ -42,6 +42,10 @@ export const THEME_LABELS: Record<string, string> = {
   "family and introductions": "Семья и знакомства",
 };
 
+export function isKnownTheme(theme: string): theme is Theme {
+  return (THEMES as readonly string[]).includes(theme);
+}
+
 export function pickRandomTheme(): string {
   return THEMES[Math.floor(Math.random() * THEMES.length)];
 }

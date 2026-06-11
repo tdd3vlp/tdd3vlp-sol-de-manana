@@ -23,6 +23,7 @@ import {
 } from "../llm/solService.js";
 import { buildLLMContext } from "../conversation/context.js";
 import {
+  isKnownTheme,
   pickRandomTheme,
   pickRandomThemes,
   shouldChangeTheme,
@@ -578,7 +579,10 @@ export async function handleCustomTopicCallback(ctx: Context): Promise<void> {
 export async function handleTopicCallback(ctx: Context): Promise<void> {
   await ctx.answerCallbackQuery();
   const theme = ctx.callbackQuery?.data?.replace("topic:", "");
-  if (!theme) return;
+  // Whitelist check: callback data comes from the client and can be forged;
+  // an arbitrary string here would land in the prompt and bypass the
+  // premium-only custom topic feature.
+  if (!theme || !isKnownTheme(theme)) return;
 
   const telegramChatId = ctx.chat?.id?.toString();
   const telegramUserId = ctx.from?.id?.toString();
