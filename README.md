@@ -39,11 +39,15 @@ The other values work as-is for local development.
 docker compose up -d
 ```
 
-**4. Apply the schema**
+**4. Apply the migrations**
 
 ```sh
-npx prisma migrate dev --name init
+npx prisma migrate dev
 ```
+
+This applies the versioned migrations from `prisma/migrations` to the local
+database. In deployment the container runs `npx prisma migrate deploy` on
+start instead, which applies pending migrations without generating new ones.
 
 **5. Start the bot**
 
