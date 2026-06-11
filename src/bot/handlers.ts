@@ -266,6 +266,29 @@ async function replyWithSpoilerTranslation(
     .catch((error) => console.error("Spoiler translation failed:", error));
 }
 
+// History is saved only after the reply is delivered (a failed LLM call or
+// Telegram send must not leave messages the user never saw in the LLM
+// context), and a persistence failure after delivery must not reach the
+// caller's catch — the user already got the answer, so an apology and a
+// limit refund would both be wrong. Losing the pair from history is the
+// lesser harm; log it and move on.
+async function saveDeliveredMessages(
+  chatId: string,
+  entries: Array<{ role: "user" | "assistant"; text: string; llmJson?: string }>,
+): Promise<void> {
+  try {
+    for (const entry of entries) {
+      if (entry.llmJson === undefined) {
+        await saveMessage(chatId, entry.role, entry.text);
+      } else {
+        await saveMessage(chatId, entry.role, entry.text, entry.llmJson);
+      }
+    }
+  } catch (error) {
+    console.error("Failed to persist delivered messages:", error);
+  }
+}
+
 function buildSpoiler(translation: string | null | undefined): string {
   if (!translation) return "";
   const escaped = translation
@@ -337,8 +360,9 @@ async function enterDialogueMode(ctx: Context): Promise<void> {
       response,
       buildDialogueKeyboard(chat.plan, telegramUserId),
     );
-    // Saved after delivery — see the ordering note in handleMessage
-    await saveMessage(chat.id, "assistant", rawText, JSON.stringify(response));
+    await saveDeliveredMessages(chat.id, [
+      { role: "assistant", text: rawText, llmJson: JSON.stringify(response) },
+    ]);
   } catch (error) {
     console.error("enterDialogueMode error:", error);
     if (consumed) await refundDailyMessage(chat.id);
@@ -518,8 +542,9 @@ async function handleCustomTopicInput(
       response,
       buildDialogueKeyboard(chat.plan, telegramUserId),
     );
-    // Saved after delivery — see the ordering note in handleMessage
-    await saveMessage(chat.id, "assistant", rawText, JSON.stringify(response));
+    await saveDeliveredMessages(chat.id, [
+      { role: "assistant", text: rawText, llmJson: JSON.stringify(response) },
+    ]);
   } catch (error) {
     console.error("handleCustomTopicInput error:", error);
     if (consumed) await refundDailyMessage(chat.id);
@@ -585,8 +610,9 @@ export async function handleTopicCallback(ctx: Context): Promise<void> {
       response,
       buildDialogueKeyboard(chat.plan, telegramUserId),
     );
-    // Saved after delivery — see the ordering note in handleMessage
-    await saveMessage(chat.id, "assistant", rawText, JSON.stringify(response));
+    await saveDeliveredMessages(chat.id, [
+      { role: "assistant", text: rawText, llmJson: JSON.stringify(response) },
+    ]);
   } catch (error) {
     console.error("handleTopicCallback error:", error);
     if (consumed) await refundDailyMessage(chat.id);
@@ -693,12 +719,11 @@ export async function handleMessage(ctx: Context): Promise<void> {
     const rawText = assembleMessage(response, userText);
     await replyWithSpoilerTranslation(ctx, rawText, response);
 
-    // Persist the pair only after the reply is delivered: a failed LLM call
-    // or a failed Telegram send must not leave messages in history that the
-    // user never saw — the next LLM context would treat them as answered.
     // The background spoiler edit is not part of critical delivery.
-    await saveMessage(chat.id, "user", userText);
-    await saveMessage(chat.id, "assistant", rawText, JSON.stringify(response));
+    await saveDeliveredMessages(chat.id, [
+      { role: "user", text: userText },
+      { role: "assistant", text: rawText, llmJson: JSON.stringify(response) },
+    ]);
   } catch (error) {
     if (consumed) await refundDailyMessage(chat.id);
     if (error instanceof SolServiceError) {

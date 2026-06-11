@@ -478,6 +478,22 @@ describe("handleMessage", () => {
     expect(refundDailyMessage).toHaveBeenCalled();
   });
 
+  it("does not apologize or refund when only persistence fails after delivery", async () => {
+    const chat = makeChat();
+    vi.mocked(getOrCreateChat).mockResolvedValue(chat);
+    vi.mocked(updateChatTheme).mockResolvedValue({ ...chat, themeReplyCount: 1 });
+    vi.mocked(callSol).mockResolvedValue(makeSolResponse());
+    vi.mocked(saveMessage).mockRejectedValue(new Error("db down"));
+
+    const ctx = makeCtx();
+    await handleMessage(ctx);
+
+    // The user already received the answer: only the dialogue reply goes out,
+    // no apology, and the consumed message stays consumed.
+    expect(ctx.reply).toHaveBeenCalledOnce();
+    expect(refundDailyMessage).not.toHaveBeenCalled();
+  });
+
   it("does nothing when message text is missing", async () => {
     const ctx = {
       chat: { id: 1 },
