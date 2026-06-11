@@ -419,7 +419,10 @@
         }
         const plan = action.replace("pay:", "");
         // Reusable Stars subscription invoice links (30 days, auto-renew),
-        // created once via createInvoiceLink.
+        // created once via createInvoiceLink. The amount is baked into the
+        // link: after any change to PLAN_PRICES_STARS (src/subscription/
+        // plans.ts) these links must be re-created, or pre-checkout will
+        // reject every payment started from the WebApp.
         const invoiceLinks = {
           basic: "https://t.me/$VqZG4N3PUUl5GAAAY9rDt4JlueY",
           premium: "https://t.me/$agEqnt3PUUl6GAAAhqTPklvmbaI",

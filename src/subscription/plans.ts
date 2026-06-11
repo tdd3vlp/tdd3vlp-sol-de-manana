@@ -22,6 +22,11 @@ export function getPlanModel(plan: string, telegramUserId?: string): string {
   return PLAN_MODELS[plan as Plan] ?? PLAN_MODELS.free;
 }
 
+// When changing a price: the WebApp opens static invoice links
+// (webapp/index.html, invoiceLinks) that carry the old amount. Pre-checkout
+// validates against this table, so a stale link cannot charge the wrong
+// price — it just gets rejected. Re-create the links via createInvoiceLink
+// and update webapp/index.html in the same change.
 export const PLAN_PRICES_STARS: Record<Exclude<Plan, "free">, number> = {
   basic: 200,
   premium: 600,
