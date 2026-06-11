@@ -144,6 +144,12 @@
     .cta-free    { background: #EFE4D0; color: var(--accent-dark); }
     .cta-basic   { background: var(--accent);      color: #fff; }
     .cta-premium { background: var(--accent-dark); color: #fff; }
+    .cta-card {
+      background: var(--card-bg);
+      color: var(--accent-dark);
+      border: 1.5px solid var(--border-basic);
+    }
+    .plan-cta + .plan-cta { margin-top: 8px; }
     .plans-footer {
       margin: 14px 12px 0;
       padding: 13px 15px;
@@ -292,7 +298,8 @@
             <li>Подсказки-переводы на русском, чтобы понимать смысл</li>
             <li>Выбор готовых тем: переезд, квартира, кафе, документы, врач, транспорт и другие</li>
           </ul>
-          <button class="plan-cta cta-basic" data-action="pay:basic">Выбрать Basic</button>
+          <button class="plan-cta cta-basic" data-action="pay:basic">Оплатить 200 ⭐ — автопродление</button>
+          <button class="plan-cta cta-card" data-action="card:basic">Оплатить 299 ₽ — карта/СБП</button>
         </div></div>
       </div>
 
@@ -323,7 +330,8 @@
             <li>Больше пространства для длинных диалогов и ежедневной практики</li>
             <li>Подготовка к реальным ситуациям: аренда, документы, собеседования, медицина, общение с соседями</li>
           </ul>
-          <button class="plan-cta cta-premium" data-action="pay:premium">Выбрать Premium</button>
+          <button class="plan-cta cta-premium" data-action="pay:premium">Оплатить 600 ⭐ — автопродление</button>
+          <button class="plan-cta cta-card" data-action="card:premium">Оплатить 899 ₽ — карта/СБП</button>
         </div></div>
       </div>
 
@@ -415,6 +423,13 @@
         const action = btn.dataset.action;
         if (action === "free") {
           tg ? tg.close() : window.close();
+          return;
+        }
+        if (action.startsWith("card:")) {
+          // Card/SBP invoices need the YooKassa provider token, so the bot
+          // creates them at runtime: redirect to a /start deep link instead
+          // of opening a static invoice link.
+          openTgLink("https://t.me/soldemanana_bot?start=pay_" + action.replace("card:", "") + "_yookassa");
           return;
         }
         const plan = action.replace("pay:", "");

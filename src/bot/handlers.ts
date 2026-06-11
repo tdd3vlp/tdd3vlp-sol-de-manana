@@ -382,15 +382,19 @@ export async function handleStart(ctx: Context): Promise<void> {
   const telegramChatId = ctx.chat?.id?.toString();
   if (!telegramChatId) return;
 
-  // Deep link from the Web App: t.me/<bot>?start=pay_basic | pay_premium.
-  // sendData does not work for Web Apps opened via menu/inline buttons,
-  // so the Web App redirects here to trigger the Stars invoice.
+  // Deep link from the Web App: t.me/<bot>?start=pay_basic | pay_premium
+  // (payment method picker) or pay_basic_yookassa | pay_premium_yookassa
+  // (card/SBP invoice directly). sendData does not work for Web Apps opened
+  // via menu/inline buttons, so the Web App redirects here.
   const payload = typeof ctx.match === "string" ? ctx.match.trim() : "";
-  if (payload === "pay_basic" || payload === "pay_premium") {
-    await sendSubscriptionInvoice(
-      ctx,
-      payload.replace("pay_", "") as "basic" | "premium",
-    );
+  const payMatch = payload.match(/^pay_(basic|premium)(_yookassa)?$/);
+  if (payMatch) {
+    const plan = payMatch[1] as PaidPlan;
+    if (payMatch[2]) {
+      await sendYooKassaInvoice(ctx, plan);
+    } else {
+      await sendPaymentMethodPicker(ctx, plan);
+    }
     return;
   }
 

@@ -236,6 +236,42 @@ describe("handleStart", () => {
     expect(call[5]).toEqual([{ label: expect.stringContaining("Premium"), amount: 600 }]);
   });
 
+  it("shows the payment method picker for pay_basic deep link when YooKassa is configured", async () => {
+    (config as { yookassaProviderToken: string }).yookassaProviderToken =
+      "yookassa-token";
+    const ctx = makeCtx();
+    (ctx as { match?: string }).match = "pay_basic";
+
+    await handleStart(ctx);
+
+    expect(resetChat).not.toHaveBeenCalled();
+    expect(ctx.api.sendInvoice).not.toHaveBeenCalled();
+    expect(ctx.reply).toHaveBeenCalledWith(
+      expect.stringContaining("Basic"),
+      expect.objectContaining({ reply_markup: expect.any(Object) }),
+    );
+  });
+
+  it("sends a YooKassa invoice for pay_premium_yookassa deep link", async () => {
+    (config as { yookassaProviderToken: string }).yookassaProviderToken =
+      "yookassa-token";
+    const ctx = makeCtx();
+    (ctx as { match?: string }).match = "pay_premium_yookassa";
+
+    await handleStart(ctx);
+
+    expect(resetChat).not.toHaveBeenCalled();
+    expect(ctx.api.sendInvoice).toHaveBeenCalledWith(
+      12345,
+      expect.stringContaining("Premium"),
+      expect.any(String),
+      "plan:premium:yookassa",
+      "RUB",
+      [{ label: expect.stringContaining("Premium"), amount: 89900 }],
+      { provider_token: "yookassa-token" },
+    );
+  });
+
   it("ignores unknown start payloads and runs normal start flow", async () => {
     const chat = makeChat({ id: "chat-1", telegramChatId: "12345" });
     vi.mocked(resetChat).mockResolvedValue(chat);
