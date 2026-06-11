@@ -480,6 +480,23 @@ describe("handleMessage", () => {
     expect(refundDailyMessage).toHaveBeenCalled();
   });
 
+  it("keeps LLM-classified unsupported input out of history and theme progress", async () => {
+    const chat = makeChat();
+    vi.mocked(getOrCreateChat).mockResolvedValue(chat);
+    vi.mocked(callSol).mockResolvedValue(
+      makeSolResponse({ inputLanguage: "unsupported" })
+    );
+
+    const ctx = makeCtx();
+    await handleMessage(ctx);
+
+    // The warning is delivered, but the exchange is not part of the dialogue
+    expect(ctx.reply).toHaveBeenCalledOnce();
+    expect(refundDailyMessage).toHaveBeenCalledOnce();
+    expect(updateChatTheme).not.toHaveBeenCalled();
+    expect(saveMessages).not.toHaveBeenCalled();
+  });
+
   it("refunds only once when unsupported input is followed by a delivery failure", async () => {
     const chat = makeChat();
     vi.mocked(getOrCreateChat).mockResolvedValue(chat);

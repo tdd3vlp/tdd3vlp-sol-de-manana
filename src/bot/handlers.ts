@@ -701,14 +701,21 @@ export async function handleMessage(ctx: Context): Promise<void> {
       getPlanModel(getEffectivePlan(chat), telegramUserId),
     );
 
-    // Unsupported/nonsense input does not count against the daily limit
+    // Input the local filter missed but the LLM classified as
+    // unsupported/nonsense is not part of the dialogue: it does not count
+    // against the daily limit, does not advance the theme, and stays out of
+    // history — saved English text would pull later LLM replies toward
+    // English.
     if (
-      consumed &&
-      (response.inputLanguage === "unsupported" ||
-        response.inputLanguage === "nonsense")
+      response.inputLanguage === "unsupported" ||
+      response.inputLanguage === "nonsense"
     ) {
-      await refundDailyMessage(chat.id);
-      refunded = true;
+      if (consumed) {
+        await refundDailyMessage(chat.id);
+        refunded = true;
+      }
+      await replyWithSpoilerTranslation(ctx, assembleMessage(response, userText), response);
+      return;
     }
 
     let newCount = chat.themeReplyCount + 1;
