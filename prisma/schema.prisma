@@ -44,4 +44,8 @@ model Message {
   llmJson   String?
   createdAt DateTime @default(now())
   chat      Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+
+  // getRecentMessages filters by chatId and sorts by createdAt on every
+  // user message; Postgres does not index FK columns automatically.
+  @@index([chatId, createdAt])
 }
