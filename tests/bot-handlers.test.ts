@@ -13,6 +13,7 @@ vi.mock("../src/config/env.js", () => ({
     nodeEnv: "test",
     webAppUrl: "",
     yookassaProviderToken: "",
+    yookassaSendReceipt: false,
     adminTelegramIds: [],
   },
 }));
@@ -106,6 +107,7 @@ function makeCtx(opts: { chatId?: number; text?: string } = {}): Context {
 beforeEach(() => {
   vi.clearAllMocks();
   (config as { yookassaProviderToken: string }).yookassaProviderToken = "";
+  (config as { yookassaSendReceipt: boolean }).yookassaSendReceipt = false;
   vi.mocked(saveMessages).mockResolvedValue();
   vi.mocked(getRecentMessages).mockResolvedValue([]);
   vi.mocked(refundDailyMessage).mockResolvedValue();
@@ -325,6 +327,34 @@ describe("handleDirectPayCallback", () => {
       [{ label: expect.stringContaining("Premium"), amount: 89900 }],
       { provider_token: "yookassa-token" },
     );
+  });
+
+  it("attaches receipt data when YOOKASSA_SEND_RECEIPT is enabled", async () => {
+    (config as { yookassaProviderToken: string }).yookassaProviderToken =
+      "yookassa-token";
+    (config as { yookassaSendReceipt: boolean }).yookassaSendReceipt = true;
+    const ctx = makeCtx();
+    (ctx as { callbackQuery?: unknown }).callbackQuery = {
+      data: "pay:basic:yookassa",
+    };
+
+    await handleDirectPayCallback(ctx);
+
+    const options = vi.mocked(ctx.api.sendInvoice).mock.calls[0][6] as {
+      need_email?: boolean;
+      send_email_to_provider?: boolean;
+      provider_data?: string;
+    };
+    expect(options.need_email).toBe(true);
+    expect(options.send_email_to_provider).toBe(true);
+    const providerData = JSON.parse(options.provider_data ?? "{}");
+    expect(providerData.receipt.items).toEqual([
+      expect.objectContaining({
+        quantity: "1.00",
+        amount: { value: "299.00", currency: "RUB" },
+        vat_code: 1,
+      }),
+    ]);
   });
 });
 

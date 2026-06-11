@@ -142,6 +142,26 @@ async function sendYooKassaInvoice(
     premium: "Premium — 300 сообщений в день",
   };
   const amount = PLAN_PRICES_RUB[plan];
+  // A YooKassa shop with fiscalization enabled (Чеки от ЮKassa, 54-ФЗ)
+  // rejects payments without receipt data and a customer contact.
+  const receiptOptions = config.yookassaSendReceipt
+    ? {
+        need_email: true,
+        send_email_to_provider: true,
+        provider_data: JSON.stringify({
+          receipt: {
+            items: [
+              {
+                description: labels[plan],
+                quantity: "1.00",
+                amount: { value: (amount / 100).toFixed(2), currency: "RUB" },
+                vat_code: 1, // без НДС
+              },
+            ],
+          },
+        }),
+      }
+    : {};
   await ctx.api.sendInvoice(
     chatId,
     labels[plan],
@@ -149,7 +169,7 @@ async function sendYooKassaInvoice(
     `plan:${plan}:yookassa`,
     "RUB",
     [{ label: labels[plan], amount }],
-    { provider_token: config.yookassaProviderToken },
+    { provider_token: config.yookassaProviderToken, ...receiptOptions },
   );
 }
 

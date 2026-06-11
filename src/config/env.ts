@@ -22,4 +22,5 @@ export const config = {
     .filter(Boolean),
   webAppUrl: process.env.WEBAPP_URL ?? "",
   yookassaProviderToken: process.env.YOOKASSA_PROVIDER_TOKEN ?? "",
+  yookassaSendReceipt: process.env.YOOKASSA_SEND_RECEIPT === "true",
 } as const;
