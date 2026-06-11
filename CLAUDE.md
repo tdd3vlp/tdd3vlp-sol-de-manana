@@ -57,11 +57,20 @@ If the user writes nonsense:
 1. Warn the user briefly to write in Spanish or Russian.
 2. Do not invent meaning.
 
+If the user gives a too-short answer, such as "no sé", "sí", "probablemente", "да", "не знаю":
+
+1. Reply exactly with this Russian reminder:
+
+   `Рекомендуем отвечать полными предложениями, так как это способствует изучению языка 🙂`
+
+2. Provide a full-sentence example relevant to the current question.
+3. Continue the dialogue and ask the next natural question.
+
 ### Required Response Order
 
 Always keep this order:
 
-1. Correction, translation, or warning if needed.
+1. Correction, translation, warning, or short-answer reminder if needed.
 2. Dialogue/theme continuation.
 3. A natural next question or conversational prompt when appropriate.
 
@@ -79,6 +88,15 @@ En español: **Quiero alquilar un piso cerca del metro.**
 
 Es una buena prioridad, especialmente si todavía no conoces bien la ciudad.
 ¿Prefieres vivir en el centro o en una zona tranquila?
+```
+
+```text
+Рекомендуем отвечать полными предложениями, так как это способствует изучению языка 🙂
+
+Por ejemplo: Sí, quiero vivir en España porque me gusta el clima y quiero practicar español todos los días.
+
+Eso suena como una buena motivación.
+¿Qué ciudad de España te interesa más?
 ```
 
 ## Conversation Design
@@ -224,7 +242,9 @@ Prefer a structured response schema. The internal response should include fields
 ```ts
 type SolResponse = {
   inputLanguage: "spanish" | "russian" | "mixed" | "unsupported" | "nonsense";
+  isTooShort: boolean;
   correctionOrTranslation: string | null;
+  reminder: string | null;
   continuation: string;
   nextQuestion: string | null;
   theme: string;
@@ -302,6 +322,7 @@ Work step by step. Keep each milestone small and commit after each feature, refa
   - mixed Spanish-Russian behavior
   - English rejection
   - nonsense rejection
+  - too-short answer reminder
   - theme continuation for 4-8 replies
   - final message ordering
 - Mock OpenAI responses. Do not call real APIs in tests.
@@ -324,6 +345,7 @@ The test suite must cover:
 - message formatting
 - prompt and answer assembly
 - nonsense determination
+- short-answer behavior
 - theme count and theme switching
 - Telegram handlers with mocked dependencies
 - database helpers
@@ -367,7 +389,7 @@ The MVP is done when:
 - The bot starts locally with grammY long polling.
 - `/start` sends a welcome message and first conversation prompt.
 - User messages are processed through OpenAI structured output.
-- Spanish, Russian, mixed input, English rejection, and nonsense follow the product rules.
+- Spanish, Russian, mixed input, English rejection, nonsense, and short answers follow the product rules.
 - Chat history and theme state persist in PostgreSQL.
 - Only the last 10-15 messages are used as LLM context.
 - Tests cover core behavior without live OpenAI calls.
