@@ -353,6 +353,8 @@ describe("handleDirectPayCallback", () => {
         quantity: "1.00",
         amount: { value: "299.00", currency: "RUB" },
         vat_code: 1,
+        payment_mode: "full_payment",
+        payment_subject: "service",
       }),
     ]);
   });

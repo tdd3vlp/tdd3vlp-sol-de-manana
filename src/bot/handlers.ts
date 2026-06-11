@@ -133,7 +133,9 @@ async function sendYooKassaInvoice(
   const chatId = ctx.chat?.id;
   if (!chatId) return;
   if (!config.yookassaProviderToken) {
-    await ctx.reply("Оплата картой/СберПэй пока не настроена. Можно оплатить Stars.");
+    await ctx.reply(
+      "Оплата картой/СберПэй пока не настроена. Можно оплатить Stars.",
+    );
     return;
   }
 
@@ -156,6 +158,8 @@ async function sendYooKassaInvoice(
                 quantity: "1.00",
                 amount: { value: (amount / 100).toFixed(2), currency: "RUB" },
                 vat_code: 1, // без НДС
+                payment_mode: "full_payment",
+                payment_subject: "service",
               },
             ],
           },
@@ -247,7 +251,7 @@ export function diffAndBold(original: string, corrected: string): string {
 }
 
 const UNSUPPORTED_WARNING =
-  "Por favor, escribe en español o ruso para que podamos continuar.";
+  "Por favor, escribe en español o ruso para que podamos continuar.\nПожалуйста, пишите на испанском или русском языке, чтобы продолжить диалог.";
 
 export function assembleMessage(
   response: SolResponse,
@@ -440,10 +444,11 @@ async function enterDialogueMode(ctx: Context): Promise<void> {
   let chat = await getOrCreateChat(telegramChatId, pickRandomTheme());
   await updateChatMode(chat.id, "dialogue");
 
-  const { allowed, consumed, chat: freshChat } = await consumeDailyMessage(
-    chat,
-    telegramUserId,
-  );
+  const {
+    allowed,
+    consumed,
+    chat: freshChat,
+  } = await consumeDailyMessage(chat, telegramUserId);
   chat = freshChat;
   if (!allowed) {
     await sendPaywall(ctx, chat.plan);
@@ -545,10 +550,11 @@ async function handleTranslationInput(
     return;
   }
 
-  const { allowed, consumed, chat: freshChat } = await consumeDailyMessage(
-    chat,
-    telegramUserId,
-  );
+  const {
+    allowed,
+    consumed,
+    chat: freshChat,
+  } = await consumeDailyMessage(chat, telegramUserId);
   chat = freshChat;
   if (!allowed) {
     await sendPaywall(ctx, chat.plan);
@@ -602,8 +608,11 @@ export async function handleMoreThemes(ctx: Context): Promise<void> {
   const plan = telegramChatId
     ? getEffectivePlan(await getOrCreateChat(telegramChatId, pickRandomTheme()))
     : "free";
-  const isPremium = plan === "premium" || !!(telegramUserId && isAdminUser(telegramUserId));
-  await ctx.editMessageReplyMarkup({ reply_markup: buildTopicKeyboard(isPremium) });
+  const isPremium =
+    plan === "premium" || !!(telegramUserId && isAdminUser(telegramUserId));
+  await ctx.editMessageReplyMarkup({
+    reply_markup: buildTopicKeyboard(isPremium),
+  });
 }
 
 async function handleCustomTopicInput(
@@ -613,7 +622,9 @@ async function handleCustomTopicInput(
   telegramUserId: string | undefined,
 ): Promise<void> {
   if (userText.length > 200) {
-    await ctx.reply("Тема слишком длинная. Напиши покороче — одним предложением.");
+    await ctx.reply(
+      "Тема слишком длинная. Напиши покороче — одним предложением.",
+    );
     return;
   }
 
@@ -622,7 +633,11 @@ async function handleCustomTopicInput(
     return;
   }
 
-  const { allowed, consumed, chat: freshChat } = await consumeDailyMessage(chat, telegramUserId);
+  const {
+    allowed,
+    consumed,
+    chat: freshChat,
+  } = await consumeDailyMessage(chat, telegramUserId);
   if (!allowed) {
     await sendPaywall(ctx, chat.plan);
     return;
@@ -650,7 +665,9 @@ async function handleCustomTopicInput(
   } catch (error) {
     console.error("handleCustomTopicInput error:", error);
     if (consumed) await refundDailyMessage(chat.id);
-    await ctx.reply("Lo siento, ocurrió un error. Por favor, inténtalo de nuevo.");
+    await ctx.reply(
+      "Lo siento, ocurrió un error. Por favor, inténtalo de nuevo.",
+    );
   }
 }
 
@@ -693,10 +710,11 @@ export async function handleTopicCallback(ctx: Context): Promise<void> {
   chat = await updateChatThemeAndLock(chat.id, theme, 0, false);
   await updateChatMode(chat.id, "dialogue");
 
-  const { allowed, consumed, chat: freshChat } = await consumeDailyMessage(
-    chat,
-    telegramUserId,
-  );
+  const {
+    allowed,
+    consumed,
+    chat: freshChat,
+  } = await consumeDailyMessage(chat, telegramUserId);
   chat = freshChat;
   if (!allowed) {
     await sendPaywall(ctx, chat.plan);
@@ -781,10 +799,11 @@ export async function handleMessage(ctx: Context): Promise<void> {
   }
 
   // Dialogue mode flow
-  const { allowed, consumed, chat: freshChat } = await consumeDailyMessage(
-    chat,
-    telegramUserId,
-  );
+  const {
+    allowed,
+    consumed,
+    chat: freshChat,
+  } = await consumeDailyMessage(chat, telegramUserId);
   chat = freshChat;
   if (!allowed) {
     await sendPaywall(ctx, chat.plan);
@@ -820,7 +839,11 @@ export async function handleMessage(ctx: Context): Promise<void> {
         await refundDailyMessage(chat.id);
         refunded = true;
       }
-      await replyWithSpoilerTranslation(ctx, assembleMessage(response, userText), response);
+      await replyWithSpoilerTranslation(
+        ctx,
+        assembleMessage(response, userText),
+        response,
+      );
       return;
     }
 
@@ -885,6 +908,7 @@ export async function handleDirectPayCallback(ctx: Context): Promise<void> {
 
 export async function handlePreCheckout(ctx: Context): Promise<void> {
   const query = ctx.preCheckoutQuery;
+  console.log("pre_checkout_query received:", JSON.stringify(query));
   const payload = parsePaymentPayload(query?.invoice_payload);
   const valid =
     !!query &&
@@ -936,7 +960,7 @@ export async function handleSuccessfulPayment(ctx: Context): Promise<void> {
     ? new Date(payment.subscription_expiration_date * 1000)
     : payload.method === "yookassa"
       ? new Date(Date.now() + ONE_TIME_PAYMENT_PERIOD_MS)
-    : null;
+      : null;
 
   const upgraded = await recordPaymentAndUpgradeOnce({
     telegramChatId,
@@ -967,7 +991,7 @@ export async function handleSuccessfulPayment(ctx: Context): Promise<void> {
   await ctx.reply(
     isRenewal
       ? `Подписка ${payload.plan === "basic" ? "Basic" : "Premium"} продлена на месяц.`
-      : confirmations[payload.plan] ?? "Подписка активирована.",
+      : (confirmations[payload.plan] ?? "Подписка активирована."),
     {
       reply_markup:
         upgraded.mode === "translation"
