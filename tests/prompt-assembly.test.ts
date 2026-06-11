@@ -65,6 +65,12 @@ describe("buildSystemPrompt", () => {
     }
   });
 
+  it("requires standalone 'si' to always be corrected to 'Sí'", () => {
+    const prompt = buildSystemPrompt("supermarket");
+    expect(prompt).toContain("only of \"si\"");
+    expect(prompt).toContain("always affirmative");
+  });
+
   it("defines the current message marker contract", () => {
     const prompt = buildSystemPrompt("supermarket");
     expect(prompt).toContain(`<${CURRENT_MESSAGE_TAG}>`);

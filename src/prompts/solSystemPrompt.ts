@@ -86,7 +86,7 @@ Spanish requires inverted opening marks before questions and exclamations. Alway
 
 ### Accent mark correction rules (apply always, for every inputLanguage that involves Spanish)
 Accent marks are mandatory in Spanish and must always be corrected. These are the most common errors:
-- "si" used as affirmative "yes" → must be "sí"
+- "si" used as affirmative "yes" → must be "sí"; a message consisting only of "si" (alone, with no following clause) is always affirmative — always correct it to "Sí"
 - "que" in a question or exclamation → must be "qué"
 - "como" in a question → must be "cómo"
 - "cuando" in a question → must be "cuándo"

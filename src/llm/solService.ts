@@ -22,6 +22,14 @@ export class SolServiceError extends Error {
   }
 }
 
+// Converts null-like strings ("/null/", ":null", empty) to actual null.
+// Applied only to correctionOrTranslation — a nullable field by contract.
+const NULL_LIKE_RE = /^[/:]?null[/,.:;]?$/i;
+function normalizeNullableCorrection(s: string | null): string | null {
+  if (s === null || s === "" || NULL_LIKE_RE.test(s)) return null;
+  return s;
+}
+
 async function attemptParse(
   messages: ChatCompletionMessageParam[],
   model: string
@@ -40,12 +48,13 @@ async function attemptParse(
     console.log(`[LLM ${model}]`, JSON.stringify(parsed));
   // An echoed marker tag must never reach Telegram, the stored llmJson, or
   // future history context built from it.
+  const rawCorrection =
+    parsed.correctionOrTranslation === null
+      ? null
+      : stripCurrentMessageTags(parsed.correctionOrTranslation).trim();
   return {
     ...parsed,
-    correctionOrTranslation:
-      parsed.correctionOrTranslation === null
-        ? null
-        : stripCurrentMessageTags(parsed.correctionOrTranslation).trim(),
+    correctionOrTranslation: normalizeNullableCorrection(rawCorrection),
     continuation: stripCurrentMessageTags(parsed.continuation).trim(),
   };
 }
@@ -54,8 +63,8 @@ async function attemptParse(
 // contains the word "null" as literal text in string fields — a model artifact
 // caused by the schema using nullable fields.
 function hasNullArtifacts(r: SolResponse): boolean {
-  const nullValue = /^\s*:?null[,.]?\s*$/i;
-  const nullLine = /(?:^|\n)\s*:?null[,.]?\s*(?:\n|$)/i;
+  const nullValue = /^\s*[/:]?null[/,.]?\s*$/i;
+  const nullLine = /(?:^|\n)\s*[/:]?null[/,.]?\s*(?:\n|$)/i;
   if (typeof r.correctionOrTranslation === "string" && nullValue.test(r.correctionOrTranslation)) return true;
   if (nullLine.test(r.continuation)) return true;
   return false;

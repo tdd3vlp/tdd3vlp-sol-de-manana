@@ -68,21 +68,23 @@ describe("isNonsense pre-filter", () => {
 });
 
 describe("Semantic validation (null artifact detection)", () => {
-  it("retries when correctionOrTranslation is the string 'null'", async () => {
-    const bad = makeSolResponse({
-      correctionOrTranslation: "null",
-      continuation: "Buena idea.",
-    });
-    const good = makeSolResponse({
-      correctionOrTranslation: null,
-      continuation: "Buena idea.",
-    });
-    vi.mocked(openai.beta.chat.completions.parse)
-      .mockResolvedValueOnce({ choices: [{ message: { parsed: bad } }] } as Awaited<ReturnType<typeof openai.beta.chat.completions.parse>>)
-      .mockResolvedValueOnce({ choices: [{ message: { parsed: good } }] } as Awaited<ReturnType<typeof openai.beta.chat.completions.parse>>);
+  it("normalizes correctionOrTranslation: string 'null' to null without retry", async () => {
+    vi.mocked(openai.beta.chat.completions.parse).mockResolvedValueOnce({
+      choices: [{ message: { parsed: makeSolResponse({ correctionOrTranslation: "null", continuation: "Buena idea." }) } }],
+    } as Awaited<ReturnType<typeof openai.beta.chat.completions.parse>>);
 
     const result = await callSol("Hola", [], makeChat());
-    expect(openai.beta.chat.completions.parse).toHaveBeenCalledTimes(2);
+    expect(openai.beta.chat.completions.parse).toHaveBeenCalledTimes(1);
+    expect(result.correctionOrTranslation).toBeNull();
+  });
+
+  it("normalizes correctionOrTranslation: string '/null/' to null without retry", async () => {
+    vi.mocked(openai.beta.chat.completions.parse).mockResolvedValueOnce({
+      choices: [{ message: { parsed: makeSolResponse({ correctionOrTranslation: "/null/", continuation: "La paella es un plato típico. ¿Cuál prefieres?" }) } }],
+    } as Awaited<ReturnType<typeof openai.beta.chat.completions.parse>>);
+
+    const result = await callSol("La paella", [], makeChat());
+    expect(openai.beta.chat.completions.parse).toHaveBeenCalledTimes(1);
     expect(result.correctionOrTranslation).toBeNull();
   });
 
