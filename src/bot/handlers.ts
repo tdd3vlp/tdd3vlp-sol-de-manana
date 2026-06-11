@@ -133,7 +133,7 @@ async function sendYooKassaInvoice(
   const chatId = ctx.chat?.id;
   if (!chatId) return;
   if (!config.yookassaProviderToken) {
-    await ctx.reply("Оплата картой/СБП пока не настроена. Можно оплатить Stars.");
+    await ctx.reply("Оплата картой/СберПэй пока не настроена. Можно оплатить Stars.");
     return;
   }
 
@@ -165,7 +165,7 @@ async function sendYooKassaInvoice(
   await ctx.api.sendInvoice(
     chatId,
     labels[plan],
-    "Доступ Sol de Mañana на 30 дней. Оплата картой или через СБП.",
+    "Доступ Sol de Mañana на 30 дней. Оплата картой или через СберПэй.",
     `plan:${plan}:yookassa`,
     "RUB",
     [{ label: labels[plan], amount }],
@@ -190,7 +190,7 @@ async function sendPaymentMethodPicker(
     reply_markup: new InlineKeyboard()
       .text("Stars с автопродлением", `pay:${plan}:stars`)
       .row()
-      .text("Карта/СБП на 30 дней", `pay:${plan}:yookassa`),
+      .text("Карта/СберПэй на 30 дней", `pay:${plan}:yookassa`),
   });
 }
 
