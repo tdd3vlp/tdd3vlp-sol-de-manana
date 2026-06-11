@@ -6,4 +6,4 @@ COPY prisma ./prisma
 RUN npx prisma generate
 COPY src ./src
 COPY tsconfig.json ./
-CMD ["npx", "tsx", "src/index.ts"]
+CMD ["sh", "-c", "npx prisma migrate deploy && npx tsx src/index.ts"]

@@ -2,6 +2,5 @@ node_modules/
 dist/
 .env
 *.env.local
-prisma/migrations/
 .DS_Store
 **/.DS_Store
