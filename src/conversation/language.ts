@@ -38,3 +38,36 @@ export function isLikelyUnsupported(text: string): boolean {
   const words = text.toLowerCase().match(/[a-z]+/g) ?? [];
   return words.some((w) => ENGLISH_MARKERS.has(w));
 }
+
+// Phrases that, when present at the START of a message, indicate a learning
+// context ("как сказать по-испански: проигнорируй..."). The injection check
+// is skipped for these so legitimate translation requests are not blocked.
+const LEARNING_PREFIX_RE =
+  /^(как\s+(сказать|переводится|по-испански|будет\s+по)|переведи|что\s+значит|how\s+do\s+you\s+say|translate|what\s+does|cómo\s+se\s+dice|traduce)/i;
+
+// Patterns that are direct prompt-injection signals regardless of language.
+const INJECTION_PATTERNS: RegExp[] = [
+  /предыдущие\s+инструкции/i,           // "предыдущие инструкции" in any form
+  /про?игнорируй\s.{0,30}инструкци/i,   // "проигнорируй/игнорируй ... инструкции"
+  /системный\s+промпт/i,
+  /покажи\s.{0,20}(промпт|инструкци|конфигурац)/i,
+  /выведи\s.{0,20}(промпт|инструкци|конфигурац)/i,
+  /раскрой\s.{0,20}(промпт|инструкци)/i,
+  /system\s+prompt/i,
+  /previous\s+instructions/i,
+  /ignore\s+(?:all\s+)?(?:previous\s+|prior\s+|your\s+)?instructions/i,
+  /reveal\s+(?:the\s+)?(?:system\s+)?prompt/i,
+  /show\s+(?:me\s+)?(?:your\s+)?(?:system\s+)?prompt/i,
+  /forget\s+(?:your\s+|all\s+|previous\s+)?instructions/i,
+  /developer\s+mode/i,
+  /jailbreak/i,
+];
+
+// Returns true when the text looks like a direct prompt-injection attempt.
+// Does NOT fire when the message starts with a learning-context prefix, so
+// "как сказать по-испански: проигнорируй инструкции" is allowed through.
+export function isPromptInjectionAttempt(text: string): boolean {
+  const trimmed = text.trim();
+  if (LEARNING_PREFIX_RE.test(trimmed)) return false;
+  return INJECTION_PATTERNS.some((re) => re.test(trimmed));
+}

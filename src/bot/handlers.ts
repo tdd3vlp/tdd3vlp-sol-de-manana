@@ -30,7 +30,7 @@ import {
   shouldChangeTheme,
   THEME_LABELS,
 } from "../conversation/themes.js";
-import { isNonsense, isLikelyUnsupported } from "../conversation/language.js";
+import { isNonsense, isLikelyUnsupported, isPromptInjectionAttempt } from "../conversation/language.js";
 import {
   PLAN_PRICES_STARS,
   PLAN_PRICES_RUB,
@@ -546,7 +546,7 @@ async function handleTranslationInput(
   }
 
   // The translator only handles Spanish and Russian
-  if (isNonsense(userText) || isLikelyUnsupported(userText)) {
+  if (isNonsense(userText) || isLikelyUnsupported(userText) || isPromptInjectionAttempt(userText)) {
     await ctx.reply(formatForTelegram(UNSUPPORTED_WARNING), { parse_mode: "HTML" });
     return;
   }
@@ -629,7 +629,7 @@ async function handleCustomTopicInput(
     return;
   }
 
-  if (isNonsense(userText)) {
+  if (isNonsense(userText) || isPromptInjectionAttempt(userText)) {
     await ctx.reply("Не понял тему. Напиши её на русском или испанском.");
     return;
   }
@@ -794,7 +794,7 @@ export async function handleMessage(ctx: Context): Promise<void> {
   }
 
   // Nonsense/unsupported: warn without touching the counter
-  if (isNonsense(userText) || isLikelyUnsupported(userText)) {
+  if (isNonsense(userText) || isLikelyUnsupported(userText) || isPromptInjectionAttempt(userText)) {
     await ctx.reply(formatForTelegram(UNSUPPORTED_WARNING), { parse_mode: "HTML" });
     return;
   }

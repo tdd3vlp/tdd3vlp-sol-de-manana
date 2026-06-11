@@ -13,7 +13,7 @@ import { config } from "../config/env.js";
 import { getPlanModel } from "../subscription/plans.js";
 import type { Chat } from "@prisma/client";
 import type { LLMMessage } from "../conversation/context.js";
-import { isNonsense, isLikelyUnsupported } from "../conversation/language.js";
+import { isNonsense, isLikelyUnsupported, isPromptInjectionAttempt } from "../conversation/language.js";
 
 export class SolServiceError extends Error {
   constructor(message: string) {
@@ -199,7 +199,7 @@ export async function callSol(
   model: string = getPlanModel(chat.plan),
 ): Promise<SolResponse> {
   const nonsense = isNonsense(userText);
-  if (nonsense || isLikelyUnsupported(userText)) {
+  if (nonsense || isLikelyUnsupported(userText) || isPromptInjectionAttempt(userText)) {
     return {
       inputLanguage: nonsense ? "nonsense" : "unsupported",
       correctionOrTranslation: null,
