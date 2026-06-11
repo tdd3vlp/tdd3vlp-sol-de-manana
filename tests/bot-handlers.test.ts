@@ -243,9 +243,14 @@ describe("handleStart", () => {
 // ── handleSuccessfulPayment ──────────────────────────────────────────────────
 
 function makePaymentCtx(payment: Record<string, unknown>): Context {
+  // Valid Stars charge for the payload's plan unless the test overrides it
+  const defaults = {
+    currency: "XTR",
+    total_amount: payment.invoice_payload === "plan:premium" ? 600 : 200,
+  };
   return {
     chat: { id: 12345 },
-    message: { successful_payment: payment },
+    message: { successful_payment: { ...defaults, ...payment } },
     reply: vi.fn().mockResolvedValue({}),
   } as unknown as Context;
 }
@@ -334,6 +339,24 @@ describe("handleSuccessfulPayment", () => {
         isRecurring: true,
       })
     );
+  });
+
+  it("rejects payments with unexpected currency or amount", async () => {
+    const wrongAmount = makePaymentCtx({
+      invoice_payload: "plan:basic",
+      total_amount: 1,
+    });
+    const wrongCurrency = makePaymentCtx({
+      invoice_payload: "plan:basic",
+      currency: "USD",
+    });
+
+    await handleSuccessfulPayment(wrongAmount);
+    await handleSuccessfulPayment(wrongCurrency);
+
+    expect(recordPaymentAndUpgradeOnce).not.toHaveBeenCalled();
+    expect(wrongAmount.reply).not.toHaveBeenCalled();
+    expect(wrongCurrency.reply).not.toHaveBeenCalled();
   });
 
   it("skips duplicate payment updates without confirming twice", async () => {

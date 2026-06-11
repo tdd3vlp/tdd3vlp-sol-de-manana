@@ -758,6 +758,19 @@ export async function handleSuccessfulPayment(ctx: Context): Promise<void> {
   const plan = payload.replace("plan:", "");
   if (plan !== "basic" && plan !== "premium") return;
 
+  // Defense in depth: pre-checkout already validated this, but the payment
+  // handler must not trust that an invoice and its payload never diverge.
+  if (
+    payment.currency !== "XTR" ||
+    payment.total_amount !== PLAN_PRICES_STARS[plan]
+  ) {
+    console.error(
+      "successful_payment with unexpected currency/amount:",
+      JSON.stringify(payment),
+    );
+    return;
+  }
+
   // Telegram sends successful_payment for the initial purchase and for every
   // auto-renewal; subscription_expiration_date moves forward each cycle.
   const expiresAt = payment.subscription_expiration_date
