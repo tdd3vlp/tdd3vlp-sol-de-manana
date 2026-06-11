@@ -331,13 +331,14 @@ async function enterDialogueMode(ctx: Context): Promise<void> {
       getPlanModel(getEffectivePlan(chat), telegramUserId),
     );
     const rawText = assembleMessage(response);
-    await saveMessage(chat.id, "assistant", rawText, JSON.stringify(response));
     await replyWithSpoilerTranslation(
       ctx,
       rawText,
       response,
       buildDialogueKeyboard(chat.plan, telegramUserId),
     );
+    // Saved after delivery — see the ordering note in handleMessage
+    await saveMessage(chat.id, "assistant", rawText, JSON.stringify(response));
   } catch (error) {
     console.error("enterDialogueMode error:", error);
     if (consumed) await refundDailyMessage(chat.id);
@@ -511,13 +512,14 @@ async function handleCustomTopicInput(
       getPlanModel(getEffectivePlan(chat), telegramUserId),
     );
     const rawText = assembleMessage(response);
-    await saveMessage(chat.id, "assistant", rawText, JSON.stringify(response));
     await replyWithSpoilerTranslation(
       ctx,
       rawText,
       response,
       buildDialogueKeyboard(chat.plan, telegramUserId),
     );
+    // Saved after delivery — see the ordering note in handleMessage
+    await saveMessage(chat.id, "assistant", rawText, JSON.stringify(response));
   } catch (error) {
     console.error("handleCustomTopicInput error:", error);
     if (consumed) await refundDailyMessage(chat.id);
@@ -577,13 +579,14 @@ export async function handleTopicCallback(ctx: Context): Promise<void> {
       getPlanModel(getEffectivePlan(chat), telegramUserId),
     );
     const rawText = assembleMessage(response);
-    await saveMessage(chat.id, "assistant", rawText, JSON.stringify(response));
     await replyWithSpoilerTranslation(
       ctx,
       rawText,
       response,
       buildDialogueKeyboard(chat.plan, telegramUserId),
     );
+    // Saved after delivery — see the ordering note in handleMessage
+    await saveMessage(chat.id, "assistant", rawText, JSON.stringify(response));
   } catch (error) {
     console.error("handleTopicCallback error:", error);
     if (consumed) await refundDailyMessage(chat.id);
