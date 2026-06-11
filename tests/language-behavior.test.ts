@@ -153,6 +153,67 @@ describe("Accent correction on nouns", () => {
   });
 });
 
+describe("Current message marker in LLM calls", () => {
+  function sentMessages(callIndex = 0) {
+    return vi.mocked(openai.beta.chat.completions.parse).mock.calls[callIndex][0]
+      .messages as { role: string; content: string }[];
+  }
+
+  it("wraps only the current user message; history stays bare", async () => {
+    stubParse(makeSolResponse({ inputLanguage: "mixed" }));
+    const history = [
+      {
+        role: "user" as const,
+        content: "Tengo to preguntas потому что tengo no estos documentos",
+      },
+      { role: "assistant" as const, content: "Claro, dime qué necesitas." },
+    ];
+    await callSol("Tengo NO preguntas - это была опечатка", history, makeChat());
+
+    const messages = sentMessages();
+    expect(messages[0].role).toBe("system");
+    expect(messages[1].content).toBe(
+      "Tengo to preguntas потому что tengo no estos documentos"
+    );
+    expect(messages[2].content).toBe("Claro, dime qué necesitas.");
+    expect(messages[3].content).toBe(
+      "<CURRENT_USER_MESSAGE>\nTengo NO preguntas - это была опечатка\n</CURRENT_USER_MESSAGE>"
+    );
+  });
+
+  it("keeps the wrapped message and re-anchors the repair instruction on retry", async () => {
+    vi.mocked(openai.beta.chat.completions.parse)
+      .mockRejectedValueOnce(new Error("parse error"))
+      .mockResolvedValueOnce({
+        choices: [{ message: { parsed: makeSolResponse() } }],
+      } as Awaited<ReturnType<typeof openai.beta.chat.completions.parse>>);
+
+    await callSol("Hola.", [], makeChat());
+
+    const retryMessages = sentMessages(1);
+    const repair = retryMessages[retryMessages.length - 1];
+    const wrapped = retryMessages[retryMessages.length - 2];
+    expect(wrapped.content).toBe("<CURRENT_USER_MESSAGE>\nHola.\n</CURRENT_USER_MESSAGE>");
+    expect(repair.content).toContain(
+      "<CURRENT_USER_MESSAGE> above is still the only user input"
+    );
+  });
+
+  it("strips echoed marker tags from the parsed response", async () => {
+    stubParse(
+      makeSolResponse({
+        inputLanguage: "russian",
+        correctionOrTranslation:
+          "En español: <CURRENT_USER_MESSAGE>No tengo preguntas.</CURRENT_USER_MESSAGE>",
+        continuation: "<CURRENT_USER_MESSAGE>Entiendo. ¿Algo más?</CURRENT_USER_MESSAGE>",
+      })
+    );
+    const result = await callSol("Понял, вопросов нет.", [], makeChat());
+    expect(result.correctionOrTranslation).toBe("En español: No tengo preguntas.");
+    expect(result.continuation).toBe("Entiendo. ¿Algo más?");
+  });
+});
+
 describe("LLM failure and retry", () => {
   it("retries once on first failure and returns result on second success", async () => {
     vi.mocked(openai.beta.chat.completions.parse)

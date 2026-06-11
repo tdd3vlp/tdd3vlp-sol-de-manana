@@ -2,7 +2,13 @@ import { zodResponseFormat } from "openai/helpers/zod";
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 import { openai } from "./openaiClient.js";
 import { SolResponseSchema, type SolResponse } from "./schemas.js";
-import { buildSystemPrompt, buildStartSystemPrompt } from "../prompts/solSystemPrompt.js";
+import {
+  buildSystemPrompt,
+  buildStartSystemPrompt,
+  wrapCurrentUserMessage,
+  stripCurrentMessageTags,
+  CURRENT_MESSAGE_TAG,
+} from "../prompts/solSystemPrompt.js";
 import { config } from "../config/env.js";
 import { getPlanModel } from "../subscription/plans.js";
 import type { Chat } from "@prisma/client";
@@ -32,7 +38,16 @@ async function attemptParse(
   if (!parsed) throw new Error("Empty parsed response from OpenAI");
   if (config.nodeEnv !== "production")
     console.log(`[LLM ${model}]`, JSON.stringify(parsed));
-  return parsed;
+  // An echoed marker tag must never reach Telegram, the stored llmJson, or
+  // future history context built from it.
+  return {
+    ...parsed,
+    correctionOrTranslation:
+      parsed.correctionOrTranslation === null
+        ? null
+        : stripCurrentMessageTags(parsed.correctionOrTranslation).trim(),
+    continuation: stripCurrentMessageTags(parsed.continuation).trim(),
+  };
 }
 
 // Detects cases where Zod parsing succeeded syntactically but the response
@@ -143,7 +158,9 @@ export async function callSol(
   const baseMessages: ChatCompletionMessageParam[] = [
     { role: "system", content: buildSystemPrompt(chat.currentTheme) },
     ...history.map((m) => ({ role: m.role, content: m.content })),
-    { role: "user", content: userText },
+    // Only the newest turn is wrapped — history turns are bare, so the
+    // marker unambiguously tells the model which text to correct/translate.
+    { role: "user", content: wrapCurrentUserMessage(userText) },
   ];
 
   try {
@@ -155,10 +172,11 @@ export async function callSol(
     try {
       const repairMessages: ChatCompletionMessageParam[] = [
         ...baseMessages,
+        // Re-anchor on the marker: this extra user turn must not become the
+        // "current message" in the model's eyes.
         {
           role: "user",
-          content:
-            "Your previous response was invalid. Please respond again with valid JSON that strictly matches the required schema.",
+          content: `Your previous response was invalid. Respond again with valid JSON that strictly matches the required schema. The <${CURRENT_MESSAGE_TAG}> above is still the only user input to process.`,
         },
       ];
       const retry = await attemptParse(repairMessages, model);

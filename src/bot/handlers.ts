@@ -39,6 +39,7 @@ import {
   isAdminUser,
 } from "../subscription/plans.js";
 import { config } from "../config/env.js";
+import { stripCurrentMessageTags } from "../prompts/solSystemPrompt.js";
 import type { SolResponse } from "../llm/schemas.js";
 
 const WELCOME_STICKER_ID =
@@ -131,8 +132,10 @@ function meaningful(s: string | null): s is string {
   );
 }
 
-function sanitizeNullTokens(s: string): string {
-  return s
+function sanitizeLlmArtifacts(s: string): string {
+  // Belt over the source-level strip in solService: an echoed marker tag
+  // must never reach the user, whichever path the response object took.
+  return stripCurrentMessageTags(s)
     .replace(/\/n/g, "\n")
     .replace(/^(\s*:?null[,.:;]?\s*\n*)+/i, "")
     .replace(/\bnull[,.:;]?\s*/gi, "")
@@ -176,7 +179,7 @@ export function assembleMessage(
 
   const parts: string[] = [];
   if (meaningful(response.correctionOrTranslation)) {
-    let correction = sanitizeNullTokens(response.correctionOrTranslation);
+    let correction = sanitizeLlmArtifacts(response.correctionOrTranslation);
     const plain = correction.replace(/\*\*(.+?)\*\*/g, "$1");
     if (
       userInput &&
@@ -196,7 +199,7 @@ export function assembleMessage(
     }
     if (meaningful(correction)) parts.push(correction);
   }
-  const cont = sanitizeNullTokens(response.continuation).replace(
+  const cont = sanitizeLlmArtifacts(response.continuation).replace(
     /\*\*(.+?)\*\*/g,
     "$1",
   );

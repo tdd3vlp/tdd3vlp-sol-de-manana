@@ -90,6 +90,21 @@ describe("assembleMessage — continuation bold stripping", () => {
   });
 });
 
+describe("assembleMessage — marker tag stripping", () => {
+  it("removes echoed CURRENT_USER_MESSAGE tags from both fields", () => {
+    const r = makeSolResponse({
+      inputLanguage: "russian",
+      correctionOrTranslation:
+        "En español: <CURRENT_USER_MESSAGE>Quiero un café.</CURRENT_USER_MESSAGE>",
+      continuation: "<CURRENT_USER_MESSAGE>¿Con leche o solo?</CURRENT_USER_MESSAGE>",
+    });
+    const out = assembleMessage(r);
+    expect(out).not.toContain("CURRENT_USER_MESSAGE");
+    expect(out).toContain("Quiero un café.");
+    expect(out).toContain("¿Con leche o solo?");
+  });
+});
+
 describe("bold formatting end-to-end (assembleMessage → formatForTelegram)", () => {
   it("renders café correction as <b>café</b> in Telegram HTML", () => {
     const r = makeSolResponse({
