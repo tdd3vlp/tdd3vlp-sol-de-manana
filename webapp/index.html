@@ -426,10 +426,11 @@
           return;
         }
         if (action.startsWith("card:")) {
-          // Card/SBP invoices need the YooKassa provider token, so the bot
-          // creates them at runtime: redirect to a /start deep link instead
-          // of opening a static invoice link.
-          openTgLink("https://t.me/soldemanana_bot?start=pay_" + action.replace("card:", "") + "_yookassa");
+          const plan = action.replace("card:", "");
+          btn.disabled = true;
+          btn.textContent = "Счёт отправляем в чат…";
+          openTgLink("https://t.me/soldemanana_bot?start=pay_" + plan + "_yookassa");
+          setTimeout(() => { if (tg) tg.close(); }, 400);
           return;
         }
         const plan = action.replace("pay:", "");
