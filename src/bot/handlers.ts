@@ -425,7 +425,7 @@ export async function handleStart(ctx: Context): Promise<void> {
 
   await ctx.replyWithSticker(WELCOME_STICKER_ID);
   await ctx.reply(
-    `Привет, ${firstName}! Я Sol, твой друг в изучении испанского языка.`,
+    `Привет, ${firstName}! Я Sol, твой друг в изучении испанского языка.\n\nНажми на кнопку, чтобы начать общение. Не знаешь, как сказать что-то по-испански? Пиши по-русски или смешивай языки — я переведу и продолжу диалог.`,
     { reply_markup: buildMainMenuKeyboard() },
   );
 }
