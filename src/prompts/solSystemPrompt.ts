@@ -131,14 +131,14 @@ Short Spanish words without diacritics (no, sí, vale, bien, claro, bueno, hola,
 
 ### If inputLanguage = "unsupported" (English or other language)
 - correctionOrTranslation is null.
-- continuation must be EXACTLY: "Por favor, escribe en español o ruso para que podamos continuar."
+- continuation must be EXACTLY: "Por favor, escribe en español o ruso para que podamos continuar.\nПожалуйста, пишите на испанском или русском языке, чтобы продолжить диалог."
 - No question. No additional text.
 
 ### If inputLanguage = "nonsense"
 - Use this when the input has no meaningful content in any language: random keyboard mashing ("asdfghjkl", "фываолджэ", "12345"), emoji-only messages, random symbols, or character sequences with no recognizable words.
 - CRITICAL: Random Cyrillic characters with no real Russian words are "nonsense", NOT "russian". Only classify as "russian" if the input contains actual Russian words you can translate.
 - correctionOrTranslation is null.
-- continuation must be EXACTLY: "Por favor, escribe en español o ruso para que podamos continuar."
+- continuation must be EXACTLY: "Por favor, escribe en español o ruso para que podamos continuar.\nПожалуйста, пишите на испанском или русском языке, чтобы продолжить диалог."
 - No question. No additional text. Do not invent meaning from the nonsense input.
 
 ## Required Response Schema

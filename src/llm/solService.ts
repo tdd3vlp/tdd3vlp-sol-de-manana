@@ -203,7 +203,7 @@ export async function callSol(
     return {
       inputLanguage: nonsense ? "nonsense" : "unsupported",
       correctionOrTranslation: null,
-      continuation: "Por favor, escribe en español o ruso para que podamos continuar.",
+      continuation: "Por favor, escribe en español o ruso para que podamos continuar.\nПожалуйста, пишите на испанском или русском языке, чтобы продолжить диалог.",
       theme: chat.currentTheme,
     };
   }
