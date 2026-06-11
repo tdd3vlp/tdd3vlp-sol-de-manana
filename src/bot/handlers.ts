@@ -689,6 +689,11 @@ export async function handleMessage(ctx: Context): Promise<void> {
   const recentMessages = await getRecentMessages(chat.id, 14);
   const llmHistory = buildLLMContext(recentMessages);
 
+  // Guards against a double refund: if the LLM classifies the input as
+  // unsupported/nonsense (refunded here) and a later step still throws,
+  // the catch must not refund the same message again.
+  let refunded = false;
+
   try {
     const response = await callSol(
       userText,
@@ -704,6 +709,7 @@ export async function handleMessage(ctx: Context): Promise<void> {
         response.inputLanguage === "nonsense")
     ) {
       await refundDailyMessage(chat.id);
+      refunded = true;
     }
 
     let newCount = chat.themeReplyCount + 1;
@@ -725,7 +731,7 @@ export async function handleMessage(ctx: Context): Promise<void> {
       { role: "assistant", text: rawText, llmJson: JSON.stringify(response) },
     ]);
   } catch (error) {
-    if (consumed) await refundDailyMessage(chat.id);
+    if (consumed && !refunded) await refundDailyMessage(chat.id);
     if (error instanceof SolServiceError) {
       console.error("LLM service error in handleMessage:", error);
       await ctx.reply(

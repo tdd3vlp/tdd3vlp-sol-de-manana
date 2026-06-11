@@ -478,6 +478,23 @@ describe("handleMessage", () => {
     expect(refundDailyMessage).toHaveBeenCalled();
   });
 
+  it("refunds only once when unsupported input is followed by a delivery failure", async () => {
+    const chat = makeChat();
+    vi.mocked(getOrCreateChat).mockResolvedValue(chat);
+    vi.mocked(updateChatTheme).mockResolvedValue({ ...chat, themeReplyCount: 1 });
+    vi.mocked(callSol).mockResolvedValue(
+      makeSolResponse({ inputLanguage: "unsupported" })
+    );
+
+    const ctx = makeCtx();
+    // First reply (the warning) fails; the apology in the catch goes through.
+    vi.mocked(ctx.reply).mockRejectedValueOnce(new Error("telegram down"));
+
+    await handleMessage(ctx);
+
+    expect(refundDailyMessage).toHaveBeenCalledOnce();
+  });
+
   it("does not apologize or refund when only persistence fails after delivery", async () => {
     const chat = makeChat();
     vi.mocked(getOrCreateChat).mockResolvedValue(chat);
