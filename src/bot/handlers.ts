@@ -726,12 +726,19 @@ export async function handleMessage(ctx: Context): Promise<void> {
       newCount = 0;
     }
 
-    chat = await updateChatTheme(chat.id, currentTheme, newCount);
-
     const rawText = assembleMessage(response, userText);
     await replyWithSpoilerTranslation(ctx, rawText, response);
-
     // The background spoiler edit is not part of critical delivery.
+
+    // Dialogue state advances only after the user saw the reply, and — like
+    // saveDeliveredMessages — its failure must not reach the apology/refund
+    // catch: the answer is already delivered.
+    try {
+      await updateChatTheme(chat.id, currentTheme, newCount);
+    } catch (error) {
+      console.error("Failed to update theme after delivery:", error);
+    }
+
     await saveDeliveredMessages(chat.id, [
       { role: "user", text: userText },
       { role: "assistant", text: rawText, llmJson: JSON.stringify(response) },

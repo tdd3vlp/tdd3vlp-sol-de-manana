@@ -475,8 +475,10 @@ describe("handleMessage", () => {
 
     await handleMessage(ctx);
 
-    // History must not contain a reply the user never saw
+    // History must not contain a reply the user never saw, and dialogue
+    // state must not advance past it either
     expect(saveMessages).not.toHaveBeenCalled();
+    expect(updateChatTheme).not.toHaveBeenCalled();
     expect(refundDailyMessage).toHaveBeenCalled();
   });
 
