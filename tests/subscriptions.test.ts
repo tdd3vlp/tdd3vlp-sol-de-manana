@@ -150,19 +150,15 @@ describe("consumeDailyMessage", () => {
   it("resets counter when resetAt is from a previous day", async () => {
     const yesterday = new Date(Date.now() - 25 * 60 * 60 * 1000);
     const chat = makeChat({ plan: "free", dailyMessageCount: 10, dailyResetAt: yesterday });
-    vi.mocked(prisma.chat.update).mockResolvedValue({
-      ...chat,
-      dailyMessageCount: 0,
-      dailyResetAt: new Date(),
-    });
 
     const result = await consumeDailyMessage(chat, "12345");
 
-    expect(prisma.chat.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({ dailyMessageCount: 0 }),
-      })
-    );
+    // The reset is conditional on the stored resetAt still being stale, so a
+    // concurrent request that already reset the day cannot be wiped again
+    expect(prisma.chat.updateMany).toHaveBeenCalledWith({
+      where: { id: chat.id, dailyResetAt: { lt: expect.any(Date) } },
+      data: { dailyMessageCount: 0, dailyResetAt: expect.any(Date) },
+    });
     expect(result.allowed).toBe(true);
     expect(result.chat.dailyMessageCount).toBe(1);
   });
@@ -171,6 +167,8 @@ describe("consumeDailyMessage", () => {
     const chat = makeChat({ plan: "free", dailyMessageCount: 3, dailyResetAt: new Date() });
     await consumeDailyMessage(chat, "12345");
     expect(prisma.chat.update).not.toHaveBeenCalled();
+    // Only the conditional increment ran, no reset
+    expect(prisma.chat.updateMany).toHaveBeenCalledTimes(1);
   });
 
   it("downgrades to free when paid plan has expired", async () => {

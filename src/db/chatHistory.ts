@@ -1,6 +1,11 @@
 import { prisma } from "./prisma.js";
 import type { Chat, Message, Prisma } from "@prisma/client";
-import { isAdminUser, getPlanLimit, isNewDay } from "../subscription/plans.js";
+import {
+  isAdminUser,
+  getPlanLimit,
+  isNewDay,
+  getTodayStartUTC3,
+} from "../subscription/plans.js";
 import { pickRandomTheme } from "../conversation/themes.js";
 
 export type { Chat, Message };
@@ -81,10 +86,14 @@ export async function consumeDailyMessage(
   }
 
   if (isNewDay(current.dailyResetAt)) {
-    current = await prisma.chat.update({
-      where: { id: current.id },
+    // Conditional reset: at the day boundary two concurrent requests can both
+    // see the stale dailyResetAt. The where clause lets only the first one
+    // zero the counter, so the second cannot wipe an increment made in between.
+    await prisma.chat.updateMany({
+      where: { id: current.id, dailyResetAt: { lt: getTodayStartUTC3() } },
       data: { dailyMessageCount: 0, dailyResetAt: new Date() },
     });
+    current = { ...current, dailyMessageCount: 0, dailyResetAt: new Date() };
   }
 
   // Atomic check-and-increment: the row is updated only while under the
