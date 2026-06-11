@@ -20,7 +20,7 @@ vi.mock("../src/db/prisma.js", () => ({
 import { prisma } from "../src/db/prisma.js";
 import {
   getOrCreateChat,
-  saveMessage,
+  saveMessages,
   getRecentMessages,
   updateChatTheme,
   resetChat,
@@ -74,21 +74,29 @@ describe("getOrCreateChat", () => {
   });
 });
 
-describe("saveMessage", () => {
-  it("creates message with role and text", async () => {
+describe("saveMessages", () => {
+  it("creates a single message with role and text", async () => {
     vi.mocked(prisma.message.create).mockResolvedValue(mockMessage);
-    await saveMessage("chat-1", "user", "Hola");
+    await saveMessages("chat-1", [{ role: "user", text: "Hola" }]);
     expect(prisma.message.create).toHaveBeenCalledWith({
       data: { chatId: "chat-1", role: "user", text: "Hola", llmJson: undefined },
     });
+    expect(prisma.$transaction).toHaveBeenCalledOnce();
   });
 
-  it("saves llmJson when provided", async () => {
-    vi.mocked(prisma.message.create).mockResolvedValue({ ...mockMessage, role: "assistant", llmJson: "{}" });
-    await saveMessage("chat-1", "assistant", "Buenas.", "{}");
+  it("writes the user/assistant pair in one transaction", async () => {
+    vi.mocked(prisma.message.create).mockResolvedValue(mockMessage);
+    await saveMessages("chat-1", [
+      { role: "user", text: "Hola" },
+      { role: "assistant", text: "Buenas.", llmJson: "{}" },
+    ]);
+    expect(prisma.message.create).toHaveBeenCalledWith({
+      data: { chatId: "chat-1", role: "user", text: "Hola", llmJson: undefined },
+    });
     expect(prisma.message.create).toHaveBeenCalledWith({
       data: { chatId: "chat-1", role: "assistant", text: "Buenas.", llmJson: "{}" },
     });
+    expect(prisma.$transaction).toHaveBeenCalledOnce();
   });
 });
 

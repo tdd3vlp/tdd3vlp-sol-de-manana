@@ -3,7 +3,7 @@ import { InlineKeyboard, Keyboard } from "grammy";
 import type { Context } from "grammy";
 import {
   getOrCreateChat,
-  saveMessage,
+  saveMessages,
   getRecentMessages,
   updateChatTheme,
   updateChatThemeAndLock,
@@ -12,6 +12,7 @@ import {
   consumeDailyMessage,
   refundDailyMessage,
   upgradeChatPlan,
+  type NewMessage,
 } from "../db/chatHistory.js";
 import { recordPaymentAndUpgradeOnce } from "../db/payments.js";
 import {
@@ -275,16 +276,10 @@ async function replyWithSpoilerTranslation(
 // lesser harm; log it and move on.
 async function saveDeliveredMessages(
   chatId: string,
-  entries: Array<{ role: "user" | "assistant"; text: string; llmJson?: string }>,
+  entries: NewMessage[],
 ): Promise<void> {
   try {
-    for (const entry of entries) {
-      if (entry.llmJson === undefined) {
-        await saveMessage(chatId, entry.role, entry.text);
-      } else {
-        await saveMessage(chatId, entry.role, entry.text, entry.llmJson);
-      }
-    }
+    await saveMessages(chatId, entries);
   } catch (error) {
     console.error("Failed to persist delivered messages:", error);
   }

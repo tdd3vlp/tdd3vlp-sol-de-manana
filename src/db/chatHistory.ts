@@ -21,15 +21,31 @@ export async function getOrCreateChat(
   });
 }
 
-export async function saveMessage(
+export interface NewMessage {
+  role: "user" | "assistant";
+  text: string;
+  llmJson?: string;
+}
+
+// All entries are written in one transaction: a delivered user/assistant
+// pair must never be half-saved, or history would keep a dangling user
+// input that the next LLM context could answer a second time.
+export async function saveMessages(
   chatId: string,
-  role: "user" | "assistant",
-  text: string,
-  llmJson?: string
-): Promise<Message> {
-  return prisma.message.create({
-    data: { chatId, role, text, llmJson },
-  });
+  entries: NewMessage[]
+): Promise<void> {
+  await prisma.$transaction(
+    entries.map((entry) =>
+      prisma.message.create({
+        data: {
+          chatId,
+          role: entry.role,
+          text: entry.text,
+          llmJson: entry.llmJson,
+        },
+      })
+    )
+  );
 }
 
 export async function getRecentMessages(

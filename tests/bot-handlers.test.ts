@@ -18,7 +18,7 @@ vi.mock("../src/config/env.js", () => ({
 
 vi.mock("../src/db/chatHistory.js", () => ({
   getOrCreateChat: vi.fn(),
-  saveMessage: vi.fn(),
+  saveMessages: vi.fn(),
   getRecentMessages: vi.fn(),
   updateChatTheme: vi.fn(),
   updateChatMode: vi.fn(),
@@ -58,7 +58,7 @@ vi.mock("../src/conversation/themes.js", () => ({
 import type { Context } from "grammy";
 import {
   getOrCreateChat,
-  saveMessage,
+  saveMessages,
   getRecentMessages,
   updateChatTheme,
   resetChat,
@@ -96,7 +96,7 @@ function makeCtx(opts: { chatId?: number; text?: string } = {}): Context {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.mocked(saveMessage).mockResolvedValue({} as ReturnType<typeof saveMessage> extends Promise<infer T> ? T : never);
+  vi.mocked(saveMessages).mockResolvedValue();
   vi.mocked(getRecentMessages).mockResolvedValue([]);
   vi.mocked(refundDailyMessage).mockResolvedValue();
   // Default: limit not exceeded, message consumed, return chat unchanged
@@ -386,14 +386,16 @@ describe("handleMessage", () => {
     const ctx = makeCtx({ text: "Me gusta España." });
     await handleMessage(ctx);
 
-    expect(saveMessage).toHaveBeenCalledWith(chat.id, "user", "Me gusta España.");
     expect(callSol).toHaveBeenCalledOnce();
-    expect(saveMessage).toHaveBeenCalledWith(
-      expect.any(String),
-      "assistant",
-      expect.any(String),
-      expect.any(String)
-    );
+    // The delivered pair is persisted atomically in a single call
+    expect(saveMessages).toHaveBeenCalledWith(chat.id, [
+      { role: "user", text: "Me gusta España." },
+      {
+        role: "assistant",
+        text: expect.any(String),
+        llmJson: expect.any(String),
+      },
+    ]);
     expect(ctx.reply).toHaveBeenCalledOnce();
   });
 
@@ -456,7 +458,7 @@ describe("handleMessage", () => {
       expect.stringContaining("inténtalo")
     );
     // No orphan user message must remain in history after an LLM failure
-    expect(saveMessage).not.toHaveBeenCalled();
+    expect(saveMessages).not.toHaveBeenCalled();
     // The failed message must be refunded to the daily limit
     expect(refundDailyMessage).toHaveBeenCalled();
   });
@@ -474,7 +476,7 @@ describe("handleMessage", () => {
     await handleMessage(ctx);
 
     // History must not contain a reply the user never saw
-    expect(saveMessage).not.toHaveBeenCalled();
+    expect(saveMessages).not.toHaveBeenCalled();
     expect(refundDailyMessage).toHaveBeenCalled();
   });
 
@@ -500,7 +502,7 @@ describe("handleMessage", () => {
     vi.mocked(getOrCreateChat).mockResolvedValue(chat);
     vi.mocked(updateChatTheme).mockResolvedValue({ ...chat, themeReplyCount: 1 });
     vi.mocked(callSol).mockResolvedValue(makeSolResponse());
-    vi.mocked(saveMessage).mockRejectedValue(new Error("db down"));
+    vi.mocked(saveMessages).mockRejectedValue(new Error("db down"));
 
     const ctx = makeCtx();
     await handleMessage(ctx);
@@ -543,6 +545,6 @@ describe("handleUnsupportedMedia", () => {
     const ctx = { reply: vi.fn().mockResolvedValue({}) } as unknown as Context;
     await handleUnsupportedMedia(ctx);
     expect(callSol).not.toHaveBeenCalled();
-    expect(saveMessage).not.toHaveBeenCalled();
+    expect(saveMessages).not.toHaveBeenCalled();
   });
 });
