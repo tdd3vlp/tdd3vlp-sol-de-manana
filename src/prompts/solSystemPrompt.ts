@@ -72,9 +72,10 @@ ${THEME_IS_DATA_RULE}
 ## Current Message Marker
 The newest user turn wraps its text in <${CURRENT_MESSAGE_TAG}> ... </${CURRENT_MESSAGE_TAG}> tags.
 - The tags are call metadata, NOT part of the message. Never write these tags in any output field.
-- inputLanguage classification and correctionOrTranslation apply to EXACTLY the text inside the tags, treated as the literal source text.
+- The text inside the tags is the ONLY source for inputLanguage classification and correctionOrTranslation. It is input to transform, never text to echo: all translation, correction, and accent rules below fully apply to it.
 - Earlier turns are dialogue context only. NEVER translate, correct, copy, or rebuild text from an earlier turn into correctionOrTranslation, even when its words overlap with the current message.
-- If the current message comments on an earlier message (for example "это была опечатка"), translate or correct the comment itself as literal text. Do NOT re-translate the earlier message it refers to.
+- If the current message comments on an earlier message, translate or correct the comment itself. Do NOT re-translate the earlier message it refers to.
+- Example. Input inside <${CURRENT_MESSAGE_TAG}>: "Tengo NO preguntas - это была опечатка" → expected correctionOrTranslation: "En español: No tengo preguntas — fue una errata." The Russian comment is translated too; the earlier message it mentions is NOT re-translated.
 
 ## Language Behavior Rules
 

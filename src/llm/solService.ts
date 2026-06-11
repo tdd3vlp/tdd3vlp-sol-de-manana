@@ -61,6 +61,50 @@ function hasNullArtifacts(r: SolResponse): boolean {
   return false;
 }
 
+// correctionOrTranslation is pure Spanish by product contract ("Corrección:" /
+// "En español:"), so Cyrillic in it always means the model echoed untranslated
+// source text instead of translating it.
+function hasCyrillicCorrection(r: SolResponse): boolean {
+  return (
+    typeof r.correctionOrTranslation === "string" &&
+    /[А-Яа-яЁё]/.test(r.correctionOrTranslation)
+  );
+}
+
+const GENERIC_REPAIR_INSTRUCTION = `Your previous response was invalid. Respond again with valid JSON that strictly matches the required schema. The <${CURRENT_MESSAGE_TAG}> above is still the only user input to process.`;
+
+const CYRILLIC_REPAIR_INSTRUCTION = [
+  "Your previous response was invalid. correctionOrTranslation contained Cyrillic characters.",
+  `Re-process only the text inside <${CURRENT_MESSAGE_TAG}> above.`,
+  "correctionOrTranslation must be entirely in Spanish, with zero Cyrillic characters.",
+  "Return valid JSON matching the schema.",
+].join("\n");
+
+// Schema-valid responses can still break product invariants; the failure
+// carries its own repair instruction for the retry turn.
+class SemanticValidationError extends Error {
+  constructor(
+    message: string,
+    readonly repairInstruction: string,
+  ) {
+    super(message);
+    this.name = "SemanticValidationError";
+  }
+}
+
+function validateSemantics(r: SolResponse): void {
+  if (hasNullArtifacts(r))
+    throw new SemanticValidationError(
+      "Semantic validation: null artifacts in response",
+      GENERIC_REPAIR_INSTRUCTION,
+    );
+  if (hasCyrillicCorrection(r))
+    throw new SemanticValidationError(
+      "Semantic validation: cyrillic in correctionOrTranslation",
+      CYRILLIC_REPAIR_INSTRUCTION,
+    );
+}
+
 export async function translateBidirectional(
   text: string,
   model: string
@@ -165,7 +209,7 @@ export async function callSol(
 
   try {
     const first = await attemptParse(baseMessages, model);
-    if (hasNullArtifacts(first)) throw new Error("Semantic validation: null artifacts in response");
+    validateSemantics(first);
     return first;
   } catch (firstError) {
     console.warn("First LLM call failed, retrying with repair instruction:", firstError);
@@ -176,11 +220,14 @@ export async function callSol(
         // "current message" in the model's eyes.
         {
           role: "user",
-          content: `Your previous response was invalid. Respond again with valid JSON that strictly matches the required schema. The <${CURRENT_MESSAGE_TAG}> above is still the only user input to process.`,
+          content:
+            firstError instanceof SemanticValidationError
+              ? firstError.repairInstruction
+              : GENERIC_REPAIR_INSTRUCTION,
         },
       ];
       const retry = await attemptParse(repairMessages, model);
-      if (hasNullArtifacts(retry)) throw new Error("Semantic validation: null artifacts in retry response");
+      validateSemantics(retry);
       return retry;
     } catch (retryError) {
       console.error("LLM service failed after retry:", retryError);

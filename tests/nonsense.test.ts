@@ -26,7 +26,7 @@ vi.mock("../src/llm/openaiClient.js", () => ({
 }));
 
 import { openai } from "../src/llm/openaiClient.js";
-import { callSol } from "../src/llm/solService.js";
+import { callSol, SolServiceError } from "../src/llm/solService.js";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -102,6 +102,52 @@ describe("Semantic validation (null artifact detection)", () => {
     const result = await callSol("Hola", [], makeChat());
     expect(openai.beta.chat.completions.parse).toHaveBeenCalledTimes(2);
     expect(result.continuation).toBe("Buena idea. ¿Qué tal?");
+  });
+});
+
+describe("Semantic validation (Cyrillic in correction)", () => {
+  it("retries with a Cyrillic-specific repair instruction", async () => {
+    const bad = makeSolResponse({
+      inputLanguage: "mixed",
+      correctionOrTranslation: "En español: No tengo preguntas - это была опечатка",
+      continuation: "Entiendo. ¿Algo más?",
+    });
+    const good = makeSolResponse({
+      inputLanguage: "mixed",
+      correctionOrTranslation: "En español: No tengo preguntas — fue una errata.",
+      continuation: "Entiendo. ¿Algo más?",
+    });
+    vi.mocked(openai.beta.chat.completions.parse)
+      .mockResolvedValueOnce({ choices: [{ message: { parsed: bad } }] } as Awaited<ReturnType<typeof openai.beta.chat.completions.parse>>)
+      .mockResolvedValueOnce({ choices: [{ message: { parsed: good } }] } as Awaited<ReturnType<typeof openai.beta.chat.completions.parse>>);
+
+    const result = await callSol("Tengo NO preguntas - это была опечатка", [], makeChat());
+
+    expect(openai.beta.chat.completions.parse).toHaveBeenCalledTimes(2);
+    expect(result.correctionOrTranslation).toBe(
+      "En español: No tengo preguntas — fue una errata."
+    );
+
+    const retryCall = vi.mocked(openai.beta.chat.completions.parse).mock.calls[1][0];
+    const repair = retryCall.messages[retryCall.messages.length - 1];
+    expect(repair.content).toContain("contained Cyrillic characters");
+    expect(repair.content).toContain("zero Cyrillic characters");
+  });
+
+  it("throws SolServiceError when Cyrillic persists after retry", async () => {
+    const bad = makeSolResponse({
+      inputLanguage: "mixed",
+      correctionOrTranslation: "En español: No tengo preguntas - это была опечатка",
+      continuation: "Entiendo.",
+    });
+    vi.mocked(openai.beta.chat.completions.parse).mockResolvedValue({
+      choices: [{ message: { parsed: bad } }],
+    } as Awaited<ReturnType<typeof openai.beta.chat.completions.parse>>);
+
+    await expect(
+      callSol("Tengo NO preguntas - это была опечатка", [], makeChat())
+    ).rejects.toThrow(SolServiceError);
+    expect(openai.beta.chat.completions.parse).toHaveBeenCalledTimes(2);
   });
 });
 

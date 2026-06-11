@@ -70,6 +70,9 @@ describe("buildSystemPrompt", () => {
     expect(prompt).toContain(`<${CURRENT_MESSAGE_TAG}>`);
     expect(prompt).toContain("Never write these tags");
     expect(prompt).toContain("Do NOT re-translate the earlier message");
+    expect(prompt).toContain("never text to echo");
+    // The worked example: meta-comment about a previous message gets translated
+    expect(prompt).toContain("fue una errata");
   });
 });
 
