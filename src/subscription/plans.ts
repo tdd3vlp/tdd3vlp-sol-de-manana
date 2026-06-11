@@ -32,6 +32,13 @@ export const PLAN_PRICES_STARS: Record<Exclude<Plan, "free">, number> = {
   premium: 600,
 };
 
+// Telegram provider payments use the minor unit for the selected currency:
+// RUB amounts are passed in kopecks.
+export const PLAN_PRICES_RUB: Record<Exclude<Plan, "free">, number> = {
+  basic: 29900,
+  premium: 89900,
+};
+
 export function isAdminUser(telegramUserId: string): boolean {
   return config.adminTelegramIds.includes(telegramUserId);
 }

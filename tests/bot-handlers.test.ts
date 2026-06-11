@@ -12,6 +12,7 @@ vi.mock("../src/config/env.js", () => ({
     databaseUrl: "postgresql://test",
     nodeEnv: "test",
     webAppUrl: "",
+    yookassaProviderToken: "",
     adminTelegramIds: [],
   },
 }));
@@ -76,8 +77,11 @@ import {
   handleStart,
   handleMessage,
   handleUnsupportedMedia,
+  handleDirectPayCallback,
+  handlePreCheckout,
   handleSuccessfulPayment,
 } from "../src/bot/handlers.js";
+import { config } from "../src/config/env.js";
 import { recordPaymentAndUpgradeOnce } from "../src/db/payments.js";
 
 function makeCtx(opts: { chatId?: number; text?: string } = {}): Context {
@@ -90,12 +94,18 @@ function makeCtx(opts: { chatId?: number; text?: string } = {}): Context {
       message_id: 1,
     }),
     replyWithSticker: vi.fn().mockResolvedValue({}),
-    api: { editMessageText: vi.fn().mockResolvedValue(true) },
+    answerCallbackQuery: vi.fn().mockResolvedValue(true),
+    answerPreCheckoutQuery: vi.fn().mockResolvedValue(true),
+    api: {
+      editMessageText: vi.fn().mockResolvedValue(true),
+      sendInvoice: vi.fn().mockResolvedValue({}),
+    },
   } as unknown as Context;
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
+  (config as { yookassaProviderToken: string }).yookassaProviderToken = "";
   vi.mocked(saveMessages).mockResolvedValue();
   vi.mocked(getRecentMessages).mockResolvedValue([]);
   vi.mocked(refundDailyMessage).mockResolvedValue();
@@ -240,6 +250,81 @@ describe("handleStart", () => {
   });
 });
 
+// ── payment callbacks ───────────────────────────────────────────────────────
+
+describe("handleDirectPayCallback", () => {
+  it("shows payment method choices when YooKassa is configured", async () => {
+    (config as { yookassaProviderToken: string }).yookassaProviderToken =
+      "yookassa-token";
+    const ctx = makeCtx();
+    (ctx as { callbackQuery?: unknown }).callbackQuery = { data: "pay:basic" };
+
+    await handleDirectPayCallback(ctx);
+
+    expect(ctx.answerCallbackQuery).toHaveBeenCalledOnce();
+    expect(ctx.reply).toHaveBeenCalledWith(
+      expect.stringContaining("Basic"),
+      expect.objectContaining({
+        reply_markup: expect.any(Object),
+      }),
+    );
+  });
+
+  it("sends a YooKassa invoice in RUB for card/SBP payments", async () => {
+    (config as { yookassaProviderToken: string }).yookassaProviderToken =
+      "yookassa-token";
+    const ctx = makeCtx();
+    (ctx as { callbackQuery?: unknown }).callbackQuery = {
+      data: "pay:premium:yookassa",
+    };
+
+    await handleDirectPayCallback(ctx);
+
+    expect(ctx.api.sendInvoice).toHaveBeenCalledWith(
+      12345,
+      expect.stringContaining("Premium"),
+      expect.stringContaining("СБП"),
+      "plan:premium:yookassa",
+      "RUB",
+      [{ label: expect.stringContaining("Premium"), amount: 89900 }],
+      { provider_token: "yookassa-token" },
+    );
+  });
+});
+
+// ── handlePreCheckout ───────────────────────────────────────────────────────
+
+describe("handlePreCheckout", () => {
+  it("accepts a valid YooKassa pre-checkout query", async () => {
+    const ctx = makeCtx();
+    (ctx as { preCheckoutQuery?: unknown }).preCheckoutQuery = {
+      invoice_payload: "plan:basic:yookassa",
+      currency: "RUB",
+      total_amount: 29900,
+    };
+
+    await handlePreCheckout(ctx);
+
+    expect(ctx.answerPreCheckoutQuery).toHaveBeenCalledWith(true);
+  });
+
+  it("rejects a YooKassa pre-checkout query with a wrong amount", async () => {
+    const ctx = makeCtx();
+    (ctx as { preCheckoutQuery?: unknown }).preCheckoutQuery = {
+      invoice_payload: "plan:basic:yookassa",
+      currency: "RUB",
+      total_amount: 1,
+    };
+
+    await handlePreCheckout(ctx);
+
+    expect(ctx.answerPreCheckoutQuery).toHaveBeenCalledWith(
+      false,
+      expect.stringContaining("Не удалось"),
+    );
+  });
+});
+
 // ── handleSuccessfulPayment ──────────────────────────────────────────────────
 
 function makePaymentCtx(payment: Record<string, unknown>): Context {
@@ -305,6 +390,33 @@ describe("handleSuccessfulPayment", () => {
     expect(recordPaymentAndUpgradeOnce).toHaveBeenCalledWith(
       expect.objectContaining({ plan: "basic", expiresAt: null }),
     );
+  });
+
+  it("activates YooKassa payments for 30 days", async () => {
+    const now = new Date("2026-06-11T12:00:00.000Z");
+    vi.useFakeTimers();
+    vi.setSystemTime(now);
+    const ctx = makePaymentCtx({
+      invoice_payload: "plan:premium:yookassa",
+      total_amount: 89900,
+      currency: "RUB",
+      telegram_payment_charge_id: "charge-rub-1",
+      provider_payment_charge_id: "yookassa-payment-1",
+    });
+
+    await handleSuccessfulPayment(ctx);
+
+    expect(recordPaymentAndUpgradeOnce).toHaveBeenCalledWith(
+      expect.objectContaining({
+        plan: "premium",
+        amount: 89900,
+        currency: "RUB",
+        providerPaymentChargeId: "yookassa-payment-1",
+        isRecurring: false,
+        expiresAt: new Date("2026-07-11T12:00:00.000Z"),
+      }),
+    );
+    vi.useRealTimers();
   });
 
   it("ignores unknown payloads", async () => {

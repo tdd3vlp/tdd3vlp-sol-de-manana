@@ -33,6 +33,7 @@ import {
 import { isNonsense, isLikelyUnsupported } from "../conversation/language.js";
 import {
   PLAN_PRICES_STARS,
+  PLAN_PRICES_RUB,
   getPlanModel,
   getEffectivePlan,
   PLAN_LIMITS,
@@ -62,6 +63,9 @@ const translationReplyKeyboard = new Keyboard()
   .text(BTN_MODE_DIALOGUE)
   .resized()
   .persistent();
+
+type PaidPlan = "basic" | "premium";
+type PaymentMethod = "stars" | "yookassa";
 
 function buildMainMenuKeyboard(): InlineKeyboard {
   return new InlineKeyboard().text("Hola, Sol 👋", "mode_dialogue");
@@ -95,10 +99,11 @@ async function sendPaywall(ctx: Context, plan = "free"): Promise<void> {
 
 // The only subscription period Telegram allows: 30 days.
 const SUBSCRIPTION_PERIOD_SECONDS = 2592000;
+const ONE_TIME_PAYMENT_PERIOD_MS = SUBSCRIPTION_PERIOD_SECONDS * 1000;
 
 async function sendSubscriptionInvoice(
   ctx: Context,
-  plan: "basic" | "premium",
+  plan: PaidPlan,
 ): Promise<void> {
   const labels: Record<string, string> = {
     basic: "Basic — 100 сообщений в день",
@@ -119,6 +124,64 @@ async function sendSubscriptionInvoice(
     `${labels[plan]} — ${stars} ⭐ в месяц с автопродлением.\nОтменить подписку можно в любой момент в настройках Telegram.`,
     { reply_markup: new InlineKeyboard().url(`Оплатить ${stars} ⭐`, link) },
   );
+}
+
+async function sendYooKassaInvoice(
+  ctx: Context,
+  plan: PaidPlan,
+): Promise<void> {
+  const chatId = ctx.chat?.id;
+  if (!chatId) return;
+  if (!config.yookassaProviderToken) {
+    await ctx.reply("Оплата картой/СБП пока не настроена. Можно оплатить Stars.");
+    return;
+  }
+
+  const labels: Record<string, string> = {
+    basic: "Basic — 100 сообщений в день",
+    premium: "Premium — 300 сообщений в день",
+  };
+  const amount = PLAN_PRICES_RUB[plan];
+  await ctx.api.sendInvoice(
+    chatId,
+    labels[plan],
+    "Доступ Sol de Mañana на 30 дней. Оплата картой или через СБП.",
+    `plan:${plan}:yookassa`,
+    "RUB",
+    [{ label: labels[plan], amount }],
+    { provider_token: config.yookassaProviderToken },
+  );
+}
+
+async function sendPaymentMethodPicker(
+  ctx: Context,
+  plan: PaidPlan,
+): Promise<void> {
+  if (!config.yookassaProviderToken) {
+    await sendSubscriptionInvoice(ctx, plan);
+    return;
+  }
+
+  const labels: Record<PaidPlan, string> = {
+    basic: "Basic",
+    premium: "Premium",
+  };
+  await ctx.reply(`Выбери способ оплаты для ${labels[plan]}:`, {
+    reply_markup: new InlineKeyboard()
+      .text("Stars с автопродлением", `pay:${plan}:stars`)
+      .row()
+      .text("Карта/СБП на 30 дней", `pay:${plan}:yookassa`),
+  });
+}
+
+function parsePaymentPayload(
+  payload: string | undefined,
+): { plan: PaidPlan; method: PaymentMethod } | null {
+  if (!payload?.startsWith("plan:")) return null;
+  const [, plan, method = "stars"] = payload.split(":");
+  if (plan !== "basic" && plan !== "premium") return null;
+  if (method !== "stars" && method !== "yookassa") return null;
+  return { plan, method };
 }
 
 function meaningful(s: string | null): s is string {
@@ -775,24 +838,39 @@ export async function handleMessage(ctx: Context): Promise<void> {
 export async function handleWebAppData(ctx: Context): Promise<void> {
   const data = ctx.message?.web_app_data?.data;
   if (data !== "pay:basic" && data !== "pay:premium") return;
-  await sendSubscriptionInvoice(ctx, data.replace("pay:", "") as "basic" | "premium");
+  await sendPaymentMethodPicker(ctx, data.replace("pay:", "") as PaidPlan);
 }
 
 export async function handleDirectPayCallback(ctx: Context): Promise<void> {
   await ctx.answerCallbackQuery();
-  const plan = ctx.callbackQuery?.data?.replace("pay:", "");
+  const [, plan, method] = ctx.callbackQuery?.data?.split(":") ?? [];
   if (plan !== "basic" && plan !== "premium") return;
-  await sendSubscriptionInvoice(ctx, plan);
+
+  if (!method) {
+    await sendPaymentMethodPicker(ctx, plan);
+    return;
+  }
+  if (method === "stars") {
+    await sendSubscriptionInvoice(ctx, plan);
+    return;
+  }
+  if (method === "yookassa") {
+    await sendYooKassaInvoice(ctx, plan);
+  }
 }
 
 export async function handlePreCheckout(ctx: Context): Promise<void> {
   const query = ctx.preCheckoutQuery;
-  const plan = query?.invoice_payload?.replace("plan:", "");
+  const payload = parsePaymentPayload(query?.invoice_payload);
   const valid =
     !!query &&
-    (plan === "basic" || plan === "premium") &&
-    query.currency === "XTR" &&
-    query.total_amount === PLAN_PRICES_STARS[plan];
+    !!payload &&
+    ((payload.method === "stars" &&
+      query.currency === "XTR" &&
+      query.total_amount === PLAN_PRICES_STARS[payload.plan]) ||
+      (payload.method === "yookassa" &&
+        query.currency === "RUB" &&
+        query.total_amount === PLAN_PRICES_RUB[payload.plan]));
 
   if (valid) {
     await ctx.answerPreCheckoutQuery(true);
@@ -807,20 +885,20 @@ export async function handlePreCheckout(ctx: Context): Promise<void> {
 
 export async function handleSuccessfulPayment(ctx: Context): Promise<void> {
   const payment = ctx.message?.successful_payment;
-  const payload = payment?.invoice_payload;
+  const payload = parsePaymentPayload(payment?.invoice_payload);
   const telegramChatId = ctx.chat?.id?.toString();
   if (!payment || !payload || !telegramChatId) return;
 
-  if (!payload.startsWith("plan:")) return;
-  const plan = payload.replace("plan:", "");
-  if (plan !== "basic" && plan !== "premium") return;
-
   // Defense in depth: pre-checkout already validated this, but the payment
   // handler must not trust that an invoice and its payload never diverge.
-  if (
-    payment.currency !== "XTR" ||
-    payment.total_amount !== PLAN_PRICES_STARS[plan]
-  ) {
+  const validPayment =
+    (payload.method === "stars" &&
+      payment.currency === "XTR" &&
+      payment.total_amount === PLAN_PRICES_STARS[payload.plan]) ||
+    (payload.method === "yookassa" &&
+      payment.currency === "RUB" &&
+      payment.total_amount === PLAN_PRICES_RUB[payload.plan]);
+  if (!validPayment) {
     console.error(
       "successful_payment with unexpected currency/amount:",
       JSON.stringify(payment),
@@ -832,11 +910,13 @@ export async function handleSuccessfulPayment(ctx: Context): Promise<void> {
   // auto-renewal; subscription_expiration_date moves forward each cycle.
   const expiresAt = payment.subscription_expiration_date
     ? new Date(payment.subscription_expiration_date * 1000)
+    : payload.method === "yookassa"
+      ? new Date(Date.now() + ONE_TIME_PAYMENT_PERIOD_MS)
     : null;
 
   const upgraded = await recordPaymentAndUpgradeOnce({
     telegramChatId,
-    plan,
+    plan: payload.plan,
     amount: payment.total_amount,
     currency: payment.currency,
     telegramPaymentChargeId: payment.telegram_payment_charge_id,
@@ -862,8 +942,8 @@ export async function handleSuccessfulPayment(ctx: Context): Promise<void> {
   // translation-mode button.
   await ctx.reply(
     isRenewal
-      ? `Подписка ${plan === "basic" ? "Basic" : "Premium"} продлена на месяц.`
-      : confirmations[plan] ?? "Подписка активирована.",
+      ? `Подписка ${payload.plan === "basic" ? "Basic" : "Premium"} продлена на месяц.`
+      : confirmations[payload.plan] ?? "Подписка активирована.",
     {
       reply_markup:
         upgraded.mode === "translation"

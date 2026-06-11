@@ -21,4 +21,5 @@ export const config = {
     .map((s) => s.trim())
     .filter(Boolean),
   webAppUrl: process.env.WEBAPP_URL ?? "",
+  yookassaProviderToken: process.env.YOOKASSA_PROVIDER_TOKEN ?? "",
 } as const;
