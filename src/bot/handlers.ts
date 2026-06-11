@@ -251,7 +251,7 @@ export function diffAndBold(original: string, corrected: string): string {
 }
 
 const UNSUPPORTED_WARNING =
-  "Por favor, escribe en español o ruso para que podamos continuar.\nПожалуйста, пишите на испанском или русском языке, чтобы продолжить диалог.";
+  "Por favor, escribe en español o ruso para que podamos continuar.\n\n_(Пожалуйста, пишите на испанском или русском языке, чтобы продолжить диалог)_";
 
 export function assembleMessage(
   response: SolResponse,
@@ -302,7 +302,8 @@ export function formatForTelegram(text: string): string {
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
-    .replace(/\*\*(.+?)\*\*/g, "<b>$1</b>");
+    .replace(/\*\*(.+?)\*\*/g, "<b>$1</b>")
+    .replace(/_(.+?)_/gs, "<i>$1</i>");
 }
 
 // Sends the reply immediately and appends the Russian spoiler afterwards:
@@ -546,7 +547,7 @@ async function handleTranslationInput(
 
   // The translator only handles Spanish and Russian
   if (isNonsense(userText) || isLikelyUnsupported(userText)) {
-    await ctx.reply(UNSUPPORTED_WARNING);
+    await ctx.reply(formatForTelegram(UNSUPPORTED_WARNING), { parse_mode: "HTML" });
     return;
   }
 
@@ -794,7 +795,7 @@ export async function handleMessage(ctx: Context): Promise<void> {
 
   // Nonsense/unsupported: warn without touching the counter
   if (isNonsense(userText) || isLikelyUnsupported(userText)) {
-    await ctx.reply(UNSUPPORTED_WARNING);
+    await ctx.reply(formatForTelegram(UNSUPPORTED_WARNING), { parse_mode: "HTML" });
     return;
   }
 

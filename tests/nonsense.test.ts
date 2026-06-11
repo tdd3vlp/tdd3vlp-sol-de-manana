@@ -199,7 +199,7 @@ describe("Nonsense input", () => {
 
     const result = await callSol("???", [], makeChat());
     expect(assembleMessage(result)).toBe(
-      "Por favor, escribe en español o ruso para que podamos continuar.\nПожалуйста, пишите на испанском или русском языке, чтобы продолжить диалог."
+      "Por favor, escribe en español o ruso para que podamos continuar.\n\n_(Пожалуйста, пишите на испанском или русском языке, чтобы продолжить диалог)_"
     );
   });
 });
