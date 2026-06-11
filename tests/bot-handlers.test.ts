@@ -29,7 +29,7 @@ vi.mock("../src/db/chatHistory.js", () => ({
 }));
 
 vi.mock("../src/db/payments.js", () => ({
-  recordPaymentOnce: vi.fn(),
+  recordPaymentAndUpgradeOnce: vi.fn(),
 }));
 
 vi.mock("../src/llm/solService.js", () => ({
@@ -78,8 +78,7 @@ import {
   handleUnsupportedMedia,
   handleSuccessfulPayment,
 } from "../src/bot/handlers.js";
-import { upgradeChatPlan } from "../src/db/chatHistory.js";
-import { recordPaymentOnce } from "../src/db/payments.js";
+import { recordPaymentAndUpgradeOnce } from "../src/db/payments.js";
 
 function makeCtx(opts: { chatId?: number; text?: string } = {}): Context {
   return {
@@ -106,8 +105,7 @@ beforeEach(() => {
     consumed: true,
     chat,
   }));
-  vi.mocked(recordPaymentOnce).mockResolvedValue(true);
-  vi.mocked(upgradeChatPlan).mockImplementation(async (_telegramChatId, plan) =>
+  vi.mocked(recordPaymentAndUpgradeOnce).mockImplementation(async ({ plan }) =>
     makeChat({ plan }),
   );
 });
@@ -264,7 +262,13 @@ describe("handleSuccessfulPayment", () => {
 
     await handleSuccessfulPayment(ctx);
 
-    expect(upgradeChatPlan).toHaveBeenCalledWith("12345", "basic", new Date(exp * 1000));
+    expect(recordPaymentAndUpgradeOnce).toHaveBeenCalledWith(
+      expect.objectContaining({
+        telegramChatId: "12345",
+        plan: "basic",
+        expiresAt: new Date(exp * 1000),
+      }),
+    );
     expect(vi.mocked(ctx.reply).mock.calls[0][0]).toContain("активирована");
   });
 
@@ -278,7 +282,13 @@ describe("handleSuccessfulPayment", () => {
 
     await handleSuccessfulPayment(ctx);
 
-    expect(upgradeChatPlan).toHaveBeenCalledWith("12345", "premium", new Date(exp * 1000));
+    expect(recordPaymentAndUpgradeOnce).toHaveBeenCalledWith(
+      expect.objectContaining({
+        telegramChatId: "12345",
+        plan: "premium",
+        expiresAt: new Date(exp * 1000),
+      }),
+    );
     expect(vi.mocked(ctx.reply).mock.calls[0][0]).toContain("продлена");
   });
 
@@ -287,7 +297,9 @@ describe("handleSuccessfulPayment", () => {
 
     await handleSuccessfulPayment(ctx);
 
-    expect(upgradeChatPlan).toHaveBeenCalledWith("12345", "basic", null);
+    expect(recordPaymentAndUpgradeOnce).toHaveBeenCalledWith(
+      expect.objectContaining({ plan: "basic", expiresAt: null }),
+    );
   });
 
   it("ignores unknown payloads", async () => {
@@ -295,7 +307,7 @@ describe("handleSuccessfulPayment", () => {
 
     await handleSuccessfulPayment(ctx);
 
-    expect(upgradeChatPlan).not.toHaveBeenCalled();
+    expect(recordPaymentAndUpgradeOnce).not.toHaveBeenCalled();
     expect(ctx.reply).not.toHaveBeenCalled();
   });
 
@@ -311,7 +323,7 @@ describe("handleSuccessfulPayment", () => {
 
     await handleSuccessfulPayment(ctx);
 
-    expect(recordPaymentOnce).toHaveBeenCalledWith(
+    expect(recordPaymentAndUpgradeOnce).toHaveBeenCalledWith(
       expect.objectContaining({
         telegramChatId: "12345",
         plan: "basic",
@@ -324,8 +336,8 @@ describe("handleSuccessfulPayment", () => {
     );
   });
 
-  it("skips duplicate payment updates without upgrading twice", async () => {
-    vi.mocked(recordPaymentOnce).mockResolvedValue(false);
+  it("skips duplicate payment updates without confirming twice", async () => {
+    vi.mocked(recordPaymentAndUpgradeOnce).mockResolvedValue(null);
     const ctx = makePaymentCtx({
       invoice_payload: "plan:basic",
       telegram_payment_charge_id: "charge-1",
@@ -333,7 +345,6 @@ describe("handleSuccessfulPayment", () => {
 
     await handleSuccessfulPayment(ctx);
 
-    expect(upgradeChatPlan).not.toHaveBeenCalled();
     expect(ctx.reply).not.toHaveBeenCalled();
   });
 });

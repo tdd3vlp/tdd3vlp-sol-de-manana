@@ -13,7 +13,7 @@ import {
   refundDailyMessage,
   upgradeChatPlan,
 } from "../db/chatHistory.js";
-import { recordPaymentOnce } from "../db/payments.js";
+import { recordPaymentAndUpgradeOnce } from "../db/payments.js";
 import {
   callSol,
   callSolStart,
@@ -763,7 +763,7 @@ export async function handleSuccessfulPayment(ctx: Context): Promise<void> {
     ? new Date(payment.subscription_expiration_date * 1000)
     : null;
 
-  const isNewCharge = await recordPaymentOnce({
+  const upgraded = await recordPaymentAndUpgradeOnce({
     telegramChatId,
     plan,
     amount: payment.total_amount,
@@ -773,14 +773,12 @@ export async function handleSuccessfulPayment(ctx: Context): Promise<void> {
     isRecurring: payment.is_recurring ?? false,
     expiresAt,
   });
-  if (!isNewCharge) {
+  if (!upgraded) {
     console.warn(
       `Duplicate successful_payment ignored: ${payment.telegram_payment_charge_id}`,
     );
     return;
   }
-
-  const upgraded = await upgradeChatPlan(telegramChatId, plan, expiresAt);
 
   const isRenewal = payment.is_recurring && !payment.is_first_recurring;
   const confirmations: Record<string, string> = {

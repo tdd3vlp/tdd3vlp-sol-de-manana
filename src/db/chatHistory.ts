@@ -1,5 +1,5 @@
 import { prisma } from "./prisma.js";
-import type { Chat, Message } from "@prisma/client";
+import type { Chat, Message, Prisma } from "@prisma/client";
 import { isAdminUser, getPlanLimit, isNewDay } from "../subscription/plans.js";
 import { pickRandomTheme } from "../conversation/themes.js";
 
@@ -132,11 +132,13 @@ export async function updateChatThemeAndLock(
   });
 }
 
-export async function upgradeChatPlan(
+// Returns the lazy Prisma query so callers can either await it directly or
+// compose it into a transaction (see recordPaymentAndUpgradeOnce).
+export function upgradeChatPlan(
   telegramChatId: string,
   plan: string,
   expiresAt: Date | null = null
-): Promise<Chat> {
+): Prisma.PrismaPromise<Chat> {
   // Upsert: a deep-link payment can arrive before the user has ever
   // started a dialogue, so the Chat row may not exist yet.
   return prisma.chat.upsert({
