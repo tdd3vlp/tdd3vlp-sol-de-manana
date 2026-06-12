@@ -129,6 +129,12 @@ async function handleYooKassaWebhook(
   return { status: 200, message: "ok" };
 }
 
+function clientIp(req: http.IncomingMessage): string {
+  const forwarded = req.headers["x-forwarded-for"];
+  const first = Array.isArray(forwarded) ? forwarded[0] : forwarded;
+  return first?.split(",")[0]?.trim() || req.socket.remoteAddress || "unknown";
+}
+
 export function startWebhookServer(bot: Bot<Context>): http.Server {
   const server = http.createServer((req, res) => {
     const url = req.url ?? "/";
@@ -147,6 +153,11 @@ export function startWebhookServer(bot: Bot<Context>): http.Server {
         !config.yookassaWebhookToken ||
         pathToken !== config.yookassaWebhookToken
       ) {
+        // A wrong token here usually means the URL registered in the ЮKassa
+        // dashboard is stale or truncated — make that visible in the logs.
+        console.warn(
+          `Webhook 404 (token mismatch): POST ${webhookPrefix}${pathToken.slice(0, 8)}… (${pathToken.length} chars) from ${clientIp(req)}`,
+        );
         res.writeHead(404).end();
         return;
       }
@@ -164,6 +175,7 @@ export function startWebhookServer(bot: Bot<Context>): http.Server {
       return;
     }
 
+    console.warn(`HTTP 404: ${req.method} ${url} from ${clientIp(req)}`);
     res.writeHead(404).end();
   });
 
