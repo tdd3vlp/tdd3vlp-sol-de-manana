@@ -151,6 +151,59 @@ describe("Accent correction on nouns", () => {
     expect(result.inputLanguage).toBe("spanish");
     expect(result.correctionOrTranslation).toContain("inglés");
   });
+
+  it("corrects 'No se' before comma to 'No sé'", async () => {
+    stubParse(
+      makeSolResponse({
+        inputLanguage: "spanish",
+        correctionOrTranslation: "Corrección: No sé, 1000€.",
+        continuation:
+          "Con un presupuesto de 1000€ puedes encontrar buenas opciones en Barcelona. ¿Has pensado en compartir el apartamento con alguien?",
+      })
+    );
+    const result = await callSol("No se, 1000€?", [], makeChat());
+    expect(result.inputLanguage).toBe("spanish");
+    expect(result.correctionOrTranslation).toContain("sé");
+  });
+
+  it("puts the narrow 'No se' rule into the system prompt for the cheap model too", async () => {
+    stubParse(makeSolResponse({ inputLanguage: "spanish" }));
+    await callSol("No se, 1000€?", [], makeChat({ plan: "free" }));
+    const messages = vi.mocked(openai.beta.chat.completions.parse).mock.calls[0][0]
+      .messages as { role: string; content: string }[];
+    expect(messages[0].content).toContain('"No se" immediately before a comma');
+    expect(messages[0].content).toContain('Never change "se" in other positions');
+    expect(messages[0].content).toContain('"se llama", "se puede", "se sabe", "se fue"');
+  });
+
+  it("corrects 'No se' before a question mark to 'No sé'", async () => {
+    stubParse(
+      makeSolResponse({
+        inputLanguage: "spanish",
+        correctionOrTranslation: "Corrección: No sé, ¿1000 €?",
+        continuation:
+          "Ese presupuesto puede funcionar en algunas zonas. Conviene mirar bien los gastos incluidos. ¿Quieres buscar un piso solo para ti?",
+      })
+    );
+    const result = await callSol("No se? 1000€?", [], makeChat());
+    expect(result.inputLanguage).toBe("spanish");
+    expect(result.correctionOrTranslation).toContain("No sé");
+  });
+
+  it("does not force an accent onto reflexive or impersonal se forms", async () => {
+    stubParse(
+      makeSolResponse({
+        inputLanguage: "spanish",
+        correctionOrTranslation: "Corrección: ¿Se puede pagar con tarjeta?",
+        continuation:
+          "Sí, en muchos sitios se puede pagar con tarjeta. Aun así, es bueno preguntar antes. ¿Sueles llevar efectivo?",
+      })
+    );
+    const result = await callSol("Se puede pagar con tarjeta?", [], makeChat());
+    expect(result.inputLanguage).toBe("spanish");
+    expect(result.correctionOrTranslation).toContain("Se puede");
+    expect(result.correctionOrTranslation).not.toContain("Sé puede");
+  });
 });
 
 describe("Current message marker in LLM calls", () => {
@@ -211,6 +264,86 @@ describe("Current message marker in LLM calls", () => {
     const result = await callSol("Понял, вопросов нет.", [], makeChat());
     expect(result.correctionOrTranslation).toBe("En español: No tengo preguntas.");
     expect(result.continuation).toBe("Entiendo. ¿Algo más?");
+  });
+});
+
+describe("Semantic guard — explanatory correction", () => {
+  it("retries when correctionOrTranslation contains 'debe ser' and returns clean result", async () => {
+    const dirty = makeSolResponse({
+      inputLanguage: "spanish",
+      correctionOrTranslation:
+        "Corrección: Mi, mi hijo y mi esposa no es correcto. Debe ser: Mi hijo, mi esposa y yo.",
+      continuation:
+        "Es muy bonito tener una familia unida. ¿Prefieres un apartamento con más habitaciones?",
+    });
+    const clean = makeSolResponse({
+      inputLanguage: "spanish",
+      correctionOrTranslation: "Corrección: Mi hijo, mi esposa y yo.",
+      continuation:
+        "Es muy bonito tener una familia unida. ¿Prefieres un apartamento con más habitaciones?",
+    });
+    vi.mocked(openai.beta.chat.completions.parse)
+      .mockResolvedValueOnce({
+        choices: [{ message: { parsed: dirty } }],
+      } as Awaited<ReturnType<typeof openai.beta.chat.completions.parse>>)
+      .mockResolvedValueOnce({
+        choices: [{ message: { parsed: clean } }],
+      } as Awaited<ReturnType<typeof openai.beta.chat.completions.parse>>);
+
+    const result = await callSol("Mi, mi hijo y mi esposa.", [], makeChat());
+    expect(openai.beta.chat.completions.parse).toHaveBeenCalledTimes(2);
+    expect(result.correctionOrTranslation).toBe("Corrección: Mi hijo, mi esposa y yo.");
+  });
+
+  it("retries when correctionOrTranslation contains 'no es correcto'", async () => {
+    const dirty = makeSolResponse({
+      inputLanguage: "spanish",
+      correctionOrTranslation: "Corrección: Esta frase no es correcto. La forma correcta es: Esta frase no es correcta.",
+      continuation: "Sigue practicando. ¿Puedes intentarlo de nuevo?",
+    });
+    const clean = makeSolResponse({
+      inputLanguage: "spanish",
+      correctionOrTranslation: "Corrección: Esta frase no es correcta.",
+      continuation: "Sigue practicando. ¿Puedes intentarlo de nuevo?",
+    });
+    vi.mocked(openai.beta.chat.completions.parse)
+      .mockResolvedValueOnce({
+        choices: [{ message: { parsed: dirty } }],
+      } as Awaited<ReturnType<typeof openai.beta.chat.completions.parse>>)
+      .mockResolvedValueOnce({
+        choices: [{ message: { parsed: clean } }],
+      } as Awaited<ReturnType<typeof openai.beta.chat.completions.parse>>);
+
+    const result = await callSol("Esta frase no es correcto.", [], makeChat());
+    expect(openai.beta.chat.completions.parse).toHaveBeenCalledTimes(2);
+    expect(result.correctionOrTranslation).toBe("Corrección: Esta frase no es correcta.");
+  });
+
+  it("retries when correctionOrTranslation explains with 'se dice'", async () => {
+    const dirty = makeSolResponse({
+      inputLanguage: "spanish",
+      correctionOrTranslation:
+        "Corrección: No se dice 'Mi, mi hijo y mi esposa'; se dice 'Mi hijo, mi esposa y yo'.",
+      continuation:
+        "Hablar de tu familia ayuda mucho en conversaciones cotidianas. ¿Cuántos sois en casa?",
+    });
+    const clean = makeSolResponse({
+      inputLanguage: "spanish",
+      correctionOrTranslation: "Corrección: Mi hijo, mi esposa y yo.",
+      continuation:
+        "Hablar de tu familia ayuda mucho en conversaciones cotidianas. ¿Cuántos sois en casa?",
+    });
+    vi.mocked(openai.beta.chat.completions.parse)
+      .mockResolvedValueOnce({
+        choices: [{ message: { parsed: dirty } }],
+      } as Awaited<ReturnType<typeof openai.beta.chat.completions.parse>>)
+      .mockResolvedValueOnce({
+        choices: [{ message: { parsed: clean } }],
+      } as Awaited<ReturnType<typeof openai.beta.chat.completions.parse>>);
+
+    const result = await callSol("Mi, mi hijo y mi esposa.", [], makeChat());
+    expect(openai.beta.chat.completions.parse).toHaveBeenCalledTimes(2);
+    expect(result.correctionOrTranslation).toBe("Corrección: Mi hijo, mi esposa y yo.");
   });
 });
 

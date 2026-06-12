@@ -43,6 +43,10 @@ import {
   isAdminUser,
 } from "../subscription/plans.js";
 import { config } from "../config/env.js";
+import {
+  reportUserVisibleError,
+  type SendMessageApi,
+} from "./errorNotifier.js";
 import { stripCurrentMessageTags } from "../prompts/solSystemPrompt.js";
 import type { SolResponse } from "../llm/schemas.js";
 
@@ -66,6 +70,8 @@ const translationReplyKeyboard = new Keyboard()
   .text(BTN_MODE_DIALOGUE)
   .resized()
   .persistent();
+
+const LLM_NULL_ARTIFACT_RE = /^[/:]?(?:null|spanish|russian|mixed|unsupported|nonsense)[/,.:;]?\s*$/i;
 
 type PaidPlan = "basic" | "premium";
 type PaymentMethod = "stars" | "yookassa";
@@ -176,6 +182,12 @@ async function createAndSendYooKassaLink(
     );
   } catch (error) {
     console.error("Failed to create ЮKassa payment:", error);
+    void reportUserVisibleError(ctx.api, {
+      handler: "createAndSendYooKassaLink",
+      error,
+      telegramChatId,
+      plan,
+    });
     await ctx.reply("Не удалось создать платёж. Попробуй позже или оплати Stars.");
   }
 }
@@ -216,8 +228,7 @@ function meaningful(s: string | null): s is string {
   const t = s.trim().toLowerCase();
   return (
     t.length > 1 &&
-    t !== "null" &&
-    !/^:?null[,.:;]?\s*$/.test(t) &&
+    !LLM_NULL_ARTIFACT_RE.test(t) &&
     /[a-záéíóúüñа-яёА-ЯЁ]/i.test(t)
   );
 }
@@ -371,11 +382,20 @@ async function replyWithSpoilerTranslation(
 async function saveDeliveredMessages(
   chatId: string,
   entries: NewMessage[],
+  api?: SendMessageApi,
 ): Promise<void> {
   try {
     await saveMessages(chatId, entries);
   } catch (error) {
     console.error("Failed to persist delivered messages:", error);
+    if (api) {
+      void reportUserVisibleError(api, {
+        handler: "saveDeliveredMessages",
+        error,
+        telegramChatId: `db:${chatId}`,
+        severity: "warning",
+      });
+    }
   }
 }
 
@@ -387,11 +407,20 @@ async function saveDeliveredTurn(
   theme: string,
   count: number,
   entries: NewMessage[],
+  api?: SendMessageApi,
 ): Promise<void> {
   try {
     await saveTurn(chatId, theme, count, entries);
   } catch (error) {
     console.error("Failed to persist delivered turn:", error);
+    if (api) {
+      void reportUserVisibleError(api, {
+        handler: "saveDeliveredTurn",
+        error,
+        telegramChatId: `db:${chatId}`,
+        severity: "warning",
+      });
+    }
   }
 }
 
@@ -471,11 +500,20 @@ async function enterDialogueMode(ctx: Context): Promise<void> {
       response,
       buildDialogueKeyboard(chat.plan, telegramUserId),
     );
-    await saveDeliveredMessages(chat.id, [
-      { role: "assistant", text: rawText, llmJson: JSON.stringify(response) },
-    ]);
+    await saveDeliveredMessages(
+      chat.id,
+      [{ role: "assistant", text: rawText, llmJson: JSON.stringify(response) }],
+      ctx.api,
+    );
   } catch (error) {
     console.error("enterDialogueMode error:", error);
+    void reportUserVisibleError(ctx.api, {
+      handler: "enterDialogueMode",
+      error,
+      telegramChatId,
+      telegramUserId,
+      plan: chat.plan,
+    });
     if (consumed) await refundDailyMessage(chat.id);
     await ctx.reply(
       "Lo siento, ocurrió un error. Por favor, inténtalo de nuevo.",
@@ -578,6 +616,15 @@ async function handleTranslationInput(
     });
   } catch (error) {
     console.error("Translation error:", error);
+    void reportUserVisibleError(ctx.api, {
+      handler: "handleTranslationInput",
+      error,
+      telegramChatId,
+      telegramUserId,
+      plan: chat.plan,
+      mode: chat.mode,
+      inputPreview: userText,
+    });
     if (consumed) await refundDailyMessage(chat.id);
     await ctx.reply("Не удалось перевести. Попробуй ещё раз.");
   }
@@ -663,11 +710,21 @@ async function handleCustomTopicInput(
       response,
       buildDialogueKeyboard(chat.plan, telegramUserId),
     );
-    await saveDeliveredMessages(chat.id, [
-      { role: "assistant", text: rawText, llmJson: JSON.stringify(response) },
-    ]);
+    await saveDeliveredMessages(
+      chat.id,
+      [{ role: "assistant", text: rawText, llmJson: JSON.stringify(response) }],
+      ctx.api,
+    );
   } catch (error) {
     console.error("handleCustomTopicInput error:", error);
+    void reportUserVisibleError(ctx.api, {
+      handler: "handleCustomTopicInput",
+      error,
+      telegramChatId: chat.telegramChatId,
+      telegramUserId,
+      plan: chat.plan,
+      inputPreview: userText,
+    });
     if (consumed) await refundDailyMessage(chat.id);
     await ctx.reply(
       "Lo siento, ocurrió un error. Por favor, inténtalo de nuevo.",
@@ -737,11 +794,20 @@ export async function handleTopicCallback(ctx: Context): Promise<void> {
       response,
       buildDialogueKeyboard(chat.plan, telegramUserId),
     );
-    await saveDeliveredMessages(chat.id, [
-      { role: "assistant", text: rawText, llmJson: JSON.stringify(response) },
-    ]);
+    await saveDeliveredMessages(
+      chat.id,
+      [{ role: "assistant", text: rawText, llmJson: JSON.stringify(response) }],
+      ctx.api,
+    );
   } catch (error) {
     console.error("handleTopicCallback error:", error);
+    void reportUserVisibleError(ctx.api, {
+      handler: "handleTopicCallback",
+      error,
+      telegramChatId,
+      telegramUserId,
+      plan: chat.plan,
+    });
     if (consumed) await refundDailyMessage(chat.id);
     await ctx.reply(
       "Lo siento, ocurrió un error. Por favor, inténtalo de nuevo.",
@@ -895,12 +961,27 @@ export async function handleMessage(ctx: Context): Promise<void> {
     await replyWithSpoilerTranslation(ctx, rawText, response);
     // The background spoiler edit is not part of critical delivery.
 
-    await saveDeliveredTurn(chat.id, currentTheme, newCount, [
-      { role: "user", text: userText },
-      { role: "assistant", text: rawText, llmJson: JSON.stringify(response) },
-    ]);
+    await saveDeliveredTurn(
+      chat.id,
+      currentTheme,
+      newCount,
+      [
+        { role: "user", text: userText },
+        { role: "assistant", text: rawText, llmJson: JSON.stringify(response) },
+      ],
+      ctx.api,
+    );
   } catch (error) {
     if (consumed && !refunded) await refundDailyMessage(chat.id);
+    void reportUserVisibleError(ctx.api, {
+      handler: "handleMessage",
+      error,
+      telegramChatId,
+      telegramUserId,
+      plan: chat.plan,
+      mode: chat.mode,
+      inputPreview: userText,
+    });
     if (error instanceof SolServiceError) {
       console.error("LLM service error in handleMessage:", error);
       await ctx.reply(

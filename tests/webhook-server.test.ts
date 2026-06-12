@@ -109,6 +109,21 @@ describe("webhook server", () => {
     expect(res.status).toBe(404);
   });
 
+  it("logs a masked warning on wrong webhook token", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const res = await req(
+      port,
+      "POST",
+      "/webhooks/yookassa/wrong-token-12345",
+      "{}",
+    );
+    expect(res.status).toBe(404);
+    const logged = warnSpy.mock.calls.map((c) => String(c[0])).join("\n");
+    expect(logged).toContain("token mismatch");
+    expect(logged).not.toContain("wrong-token-12345");
+    warnSpy.mockRestore();
+  });
+
   it("unknown event type returns 200 without processing", async () => {
     const res = await req(
       port,
