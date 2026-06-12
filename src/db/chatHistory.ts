@@ -195,6 +195,20 @@ export function upgradeChatPlan(
   });
 }
 
+export async function setAwaitingEmail(chatId: string, plan: string): Promise<Chat> {
+  return prisma.chat.update({
+    where: { id: chatId },
+    data: { mode: "awaiting_email", pendingPaymentPlan: plan },
+  });
+}
+
+export async function saveCustomerEmail(chatId: string, email: string): Promise<Chat> {
+  return prisma.chat.update({
+    where: { id: chatId },
+    data: { customerEmail: email, mode: "dialogue", pendingPaymentPlan: null },
+  });
+}
+
 export async function resetChat(
   telegramChatId: string,
   newTheme: string

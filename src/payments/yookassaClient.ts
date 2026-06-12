@@ -22,11 +22,12 @@ function authHeader(): string {
 export async function createYookassaPayment(
   plan: PaidPlan,
   telegramChatId: string,
+  customerEmail: string,
 ): Promise<YooKassaPayment> {
   const rubles = (PLAN_PRICES_RUB[plan] / 100).toFixed(2);
   const labels: Record<PaidPlan, string> = {
-    basic: "Basic — 100 сообщений в день (30 дней)",
-    premium: "Premium — 300 сообщений в день (30 дней)",
+    basic: "Sol de Mañana — подписка Basic на 30 дней",
+    premium: "Sol de Mañana — подписка Premium на 30 дней",
   };
 
   const body: Record<string, unknown> = {
@@ -35,6 +36,19 @@ export async function createYookassaPayment(
     description: labels[plan],
     metadata: { telegramChatId, plan },
     capture: true,
+    receipt: {
+      customer: { email: customerEmail },
+      items: [
+        {
+          description: labels[plan],
+          quantity: "1.00",
+          amount: { value: rubles, currency: "RUB" },
+          vat_code: 1,
+          payment_mode: "full_payment",
+          payment_subject: "service",
+        },
+      ],
+    },
   };
 
   const response = await fetch("https://api.yookassa.ru/v3/payments", {

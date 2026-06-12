@@ -16,11 +16,13 @@ model Chat {
   planExpiresAt     DateTime?
   mode              String    @default("dialogue")
   lockTheme         Boolean   @default(false)
-  dailyMessageCount Int       @default(0)
-  dailyResetAt      DateTime  @default(now())
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
-  messages          Message[]
+  dailyMessageCount  Int       @default(0)
+  dailyResetAt       DateTime  @default(now())
+  customerEmail      String?
+  pendingPaymentPlan String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  messages           Message[]
 }
 
 model Payment {

@@ -37,7 +37,7 @@ describe("createYookassaPayment", () => {
   });
 
   it("POSTs to correct URL with Basic auth", async () => {
-    await createYookassaPayment("basic", "42");
+    await createYookassaPayment("basic", "42", "user@example.com");
     const [url, opts] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0] as [
       string,
       RequestInit,
@@ -50,7 +50,7 @@ describe("createYookassaPayment", () => {
   });
 
   it("sends correct amount in rubles for basic plan", async () => {
-    await createYookassaPayment("basic", "42");
+    await createYookassaPayment("basic", "42", "user@example.com");
     const [, opts] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0] as [
       string,
       RequestInit,
@@ -61,7 +61,7 @@ describe("createYookassaPayment", () => {
   });
 
   it("sends correct amount for premium plan", async () => {
-    await createYookassaPayment("premium", "99");
+    await createYookassaPayment("premium", "99", "user@example.com");
     const [, opts] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0] as [
       string,
       RequestInit,
@@ -71,7 +71,7 @@ describe("createYookassaPayment", () => {
   });
 
   it("includes Idempotence-Key header", async () => {
-    await createYookassaPayment("basic", "42");
+    await createYookassaPayment("basic", "42", "user@example.com");
     const [, opts] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0] as [
       string,
       RequestInit,
@@ -81,16 +81,34 @@ describe("createYookassaPayment", () => {
     ).toBeTruthy();
   });
 
+  it("includes receipt with customer email and service item", async () => {
+    await createYookassaPayment("basic", "42", "user@example.com");
+    const [, opts] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0] as [
+      string,
+      RequestInit,
+    ];
+    const body = JSON.parse(opts.body as string);
+    expect(body.receipt.customer.email).toBe("user@example.com");
+    expect(body.receipt.items).toHaveLength(1);
+    expect(body.receipt.items[0]).toMatchObject({
+      quantity: "1.00",
+      amount: { value: "299.00", currency: "RUB" },
+      vat_code: 1,
+      payment_mode: "full_payment",
+      payment_subject: "service",
+    });
+  });
+
   it("throws on non-OK response", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue({ ok: false, status: 401, text: () => Promise.resolve("Unauthorized") }),
     );
-    await expect(createYookassaPayment("basic", "42")).rejects.toThrow("401");
+    await expect(createYookassaPayment("basic", "42", "user@example.com")).rejects.toThrow("401");
   });
 
   it("returns the parsed payment object", async () => {
-    const result = await createYookassaPayment("basic", "42");
+    const result = await createYookassaPayment("basic", "42", "user@example.com");
     expect(result.id).toBe("pay-123");
     expect(result.confirmation.confirmation_url).toBe("https://yookassa.ru/pay/abc");
   });

@@ -12,6 +12,8 @@ import {
   consumeDailyMessage,
   refundDailyMessage,
   upgradeChatPlan,
+  setAwaitingEmail,
+  saveCustomerEmail,
   type NewMessage,
 } from "../db/chatHistory.js";
 import { recordPaymentAndUpgradeOnce } from "../db/payments.js";
@@ -138,6 +140,25 @@ async function sendYooKassaDirectPayment(
     return;
   }
 
+  const chat = await getOrCreateChat(telegramChatId, pickRandomTheme());
+
+  if (!chat.customerEmail) {
+    await setAwaitingEmail(chat.id, plan);
+    await ctx.reply(
+      "Для оформления фискального чека укажи email.\nОн будет использован только для отправки чека.",
+    );
+    return;
+  }
+
+  await createAndSendYooKassaLink(ctx, plan, telegramChatId, chat.customerEmail);
+}
+
+async function createAndSendYooKassaLink(
+  ctx: Context,
+  plan: PaidPlan,
+  telegramChatId: string,
+  customerEmail: string,
+): Promise<void> {
   const labels: Record<PaidPlan, string> = {
     basic: "Basic — 100 сообщений/день",
     premium: "Premium — 300 сообщений/день",
@@ -145,7 +166,7 @@ async function sendYooKassaDirectPayment(
   const rubles = PLAN_PRICES_RUB[plan] / 100;
 
   try {
-    const payment = await createYookassaPayment(plan, telegramChatId);
+    const payment = await createYookassaPayment(plan, telegramChatId, customerEmail);
     const confirmationUrl = payment.confirmation.confirmation_url;
     if (!confirmationUrl) throw new Error("ЮKassa did not return confirmation_url");
 
@@ -728,6 +749,33 @@ export async function handleTopicCallback(ctx: Context): Promise<void> {
   }
 }
 
+// ─── Email collection for ЮKassa receipts ────────────────────────────────────
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+async function handleEmailInput(
+  ctx: Context,
+  userText: string,
+  chat: Awaited<ReturnType<typeof getOrCreateChat>>,
+  telegramChatId: string,
+): Promise<void> {
+  const email = userText.trim();
+  if (!EMAIL_RE.test(email)) {
+    await ctx.reply("Некорректный email. Попробуй ещё раз, например: ivan@example.com");
+    return;
+  }
+
+  const plan = chat.pendingPaymentPlan as PaidPlan | null;
+  if (!plan || (plan !== "basic" && plan !== "premium")) {
+    await saveCustomerEmail(chat.id, email);
+    await ctx.reply("Email сохранён. Нажми кнопку оплаты ещё раз.");
+    return;
+  }
+
+  await saveCustomerEmail(chat.id, email);
+  await createAndSendYooKassaLink(ctx, plan, telegramChatId, email);
+}
+
 // ─── Main message handler ─────────────────────────────────────────────────────
 
 export async function handleMessage(ctx: Context): Promise<void> {
@@ -765,6 +813,11 @@ export async function handleMessage(ctx: Context): Promise<void> {
 
   if (chat.mode === "awaiting_custom_topic") {
     await handleCustomTopicInput(ctx, userText, chat, telegramUserId);
+    return;
+  }
+
+  if (chat.mode === "awaiting_email") {
+    await handleEmailInput(ctx, userText, chat, telegramChatId);
     return;
   }
 

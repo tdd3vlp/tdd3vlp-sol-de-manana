@@ -39,6 +39,8 @@ vi.mock("../src/db/chatHistory.js", () => ({
   consumeDailyMessage: vi.fn(),
   refundDailyMessage: vi.fn(),
   upgradeChatPlan: vi.fn(),
+  setAwaitingEmail: vi.fn(),
+  saveCustomerEmail: vi.fn(),
 }));
 
 vi.mock("../src/db/payments.js", () => ({
@@ -269,6 +271,9 @@ describe("handleStart", () => {
   it("sends a ЮKassa direct payment for pay_premium_yookassa deep link", async () => {
     (config as { yookassaShopId: string }).yookassaShopId = "shop-id";
     (config as { yookassaSecretKey: string }).yookassaSecretKey = "secret";
+    vi.mocked(getOrCreateChat).mockResolvedValueOnce(
+      makeChat({ telegramChatId: "12345", customerEmail: "user@example.com" }),
+    );
     vi.mocked(createYookassaPayment).mockResolvedValueOnce({
       id: "pay-1",
       status: "pending",
@@ -282,7 +287,7 @@ describe("handleStart", () => {
     await handleStart(ctx);
 
     expect(resetChat).not.toHaveBeenCalled();
-    expect(createYookassaPayment).toHaveBeenCalledWith("premium", "12345");
+    expect(createYookassaPayment).toHaveBeenCalledWith("premium", "12345", "user@example.com");
     expect(ctx.reply).toHaveBeenCalledWith(
       expect.stringContaining("899"),
       expect.objectContaining({ reply_markup: expect.any(Object) }),
@@ -323,6 +328,9 @@ describe("handleDirectPayCallback", () => {
   it("sends a ЮKassa direct payment URL for card/СБП payments", async () => {
     (config as { yookassaShopId: string }).yookassaShopId = "shop-id";
     (config as { yookassaSecretKey: string }).yookassaSecretKey = "secret";
+    vi.mocked(getOrCreateChat).mockResolvedValueOnce(
+      makeChat({ telegramChatId: "12345", customerEmail: "user@example.com" }),
+    );
     vi.mocked(createYookassaPayment).mockResolvedValueOnce({
       id: "pay-2",
       status: "pending",
@@ -337,7 +345,7 @@ describe("handleDirectPayCallback", () => {
 
     await handleDirectPayCallback(ctx);
 
-    expect(createYookassaPayment).toHaveBeenCalledWith("premium", "12345");
+    expect(createYookassaPayment).toHaveBeenCalledWith("premium", "12345", "user@example.com");
     expect(ctx.reply).toHaveBeenCalledWith(
       expect.stringContaining("899"),
       expect.objectContaining({ reply_markup: expect.any(Object) }),
