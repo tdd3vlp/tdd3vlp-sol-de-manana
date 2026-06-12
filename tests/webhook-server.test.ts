@@ -28,6 +28,11 @@ vi.mock("../src/bot/handlers.js", () => ({
   buildDialogueKeyboard: vi.fn(() => ({})),
 }));
 
+const mockNotifyError = vi.fn();
+vi.mock("../src/bot/errorNotifier.js", () => ({
+  notifyErrorChannel: mockNotifyError,
+}));
+
 const mockSendMessage = vi.fn().mockResolvedValue({});
 const mockBot = { api: { sendMessage: mockSendMessage } } as unknown as import("grammy").Bot;
 
@@ -207,5 +212,69 @@ describe("webhook server", () => {
     );
     expect(res.status).toBe(200);
     expect(mockRecordPayment).not.toHaveBeenCalled();
+    expect(mockNotifyError).toHaveBeenCalledWith(
+      mockBot,
+      expect.stringContaining("amount mismatch"),
+    );
+  });
+
+  it("alerts the error channel on unexpected currency (no upgrade applied)", async () => {
+    mockGetPayment.mockResolvedValueOnce({
+      id: "pay-1",
+      status: "succeeded",
+      amount: { value: "299.00", currency: "USD" },
+      metadata: { telegramChatId: "42", plan: "basic" },
+    });
+    const res = await req(
+      port,
+      "POST",
+      "/webhooks/yookassa/test-secret-token",
+      JSON.stringify({ event: "payment.succeeded", object: { id: "pay-1" } }),
+    );
+    expect(res.status).toBe(200);
+    expect(mockRecordPayment).not.toHaveBeenCalled();
+    expect(mockNotifyError).toHaveBeenCalledWith(
+      mockBot,
+      expect.stringContaining("currency"),
+    );
+  });
+
+  it("alerts the error channel on invalid metadata (no upgrade applied)", async () => {
+    mockGetPayment.mockResolvedValueOnce({
+      id: "pay-1",
+      status: "succeeded",
+      amount: { value: "299.00", currency: "RUB" },
+      metadata: {},
+    });
+    const res = await req(
+      port,
+      "POST",
+      "/webhooks/yookassa/test-secret-token",
+      JSON.stringify({ event: "payment.succeeded", object: { id: "pay-1" } }),
+    );
+    expect(res.status).toBe(200);
+    expect(mockRecordPayment).not.toHaveBeenCalled();
+    expect(mockNotifyError).toHaveBeenCalledWith(
+      mockBot,
+      expect.stringContaining("metadata"),
+    );
+  });
+
+  it("does not alert the error channel on successful payment", async () => {
+    mockGetPayment.mockResolvedValueOnce({
+      id: "pay-2",
+      status: "succeeded",
+      amount: { value: "299.00", currency: "RUB" },
+      metadata: { telegramChatId: "42", plan: "basic" },
+    });
+    mockRecordPayment.mockResolvedValueOnce({ plan: "basic", mode: "dialogue" });
+    const res = await req(
+      port,
+      "POST",
+      "/webhooks/yookassa/test-secret-token",
+      JSON.stringify({ event: "payment.succeeded", object: { id: "pay-2" } }),
+    );
+    expect(res.status).toBe(200);
+    expect(mockNotifyError).not.toHaveBeenCalled();
   });
 });

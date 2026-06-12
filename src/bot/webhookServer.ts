@@ -7,6 +7,7 @@ import { recordYooKassaPaymentAndUpgradeOnce } from "../db/payments.js";
 import { PLAN_PRICES_RUB } from "../subscription/plans.js";
 import type { Plan } from "../subscription/plans.js";
 import { buildDialogueKeyboard } from "./handlers.js";
+import { notifyErrorChannel } from "./errorNotifier.js";
 
 type PaidPlan = Exclude<Plan, "free">;
 
@@ -56,8 +57,14 @@ async function handleYooKassaWebhook(
     return { status: 200, message: "ok" };
   }
 
+  // The three checks below return 200 (so ЮKassa stops retrying) but mean a
+  // succeeded payment was NOT turned into an upgrade — alert the error channel.
   if (payment.amount.currency !== "RUB") {
     console.error("Unexpected currency in ЮKassa payment:", payment.amount.currency);
+    void notifyErrorChannel(
+      bot,
+      `ЮKassa payment ${payment.id}: unexpected currency ${payment.amount.currency}, no upgrade applied`,
+    );
     return { status: 200, message: "ok" };
   }
 
@@ -66,6 +73,10 @@ async function handleYooKassaWebhook(
 
   if (!plan || (plan !== "basic" && plan !== "premium") || !telegramChatId) {
     console.error("ЮKassa payment missing valid metadata:", payment.metadata);
+    void notifyErrorChannel(
+      bot,
+      `ЮKassa payment ${payment.id}: missing or invalid metadata, no upgrade applied`,
+    );
     return { status: 200, message: "ok" };
   }
 
@@ -73,6 +84,10 @@ async function handleYooKassaWebhook(
   const actualKopecks = Math.round(parseFloat(payment.amount.value) * 100);
   if (actualKopecks !== expectedKopecks) {
     console.error(`ЮKassa amount mismatch: expected ${expectedKopecks} got ${actualKopecks}`);
+    void notifyErrorChannel(
+      bot,
+      `ЮKassa payment ${payment.id}: amount mismatch (expected ${expectedKopecks}, got ${actualKopecks} kopecks), no upgrade applied`,
+    );
     return { status: 200, message: "ok" };
   }
 

@@ -13,7 +13,6 @@ vi.mock("../src/config/env.js", () => ({
     nodeEnv: "test",
     webAppUrl: "",
     yookassaProviderToken: "",
-    yookassaSendReceipt: false,
     yookassaShopId: "",
     yookassaSecretKey: "",
     yookassaWebhookToken: "",
@@ -121,7 +120,6 @@ function makeCtx(opts: { chatId?: number; text?: string } = {}): Context {
 beforeEach(() => {
   vi.clearAllMocks();
   (config as { yookassaProviderToken: string }).yookassaProviderToken = "";
-  (config as { yookassaSendReceipt: boolean }).yookassaSendReceipt = false;
   (config as { yookassaShopId: string }).yookassaShopId = "";
   (config as { yookassaSecretKey: string }).yookassaSecretKey = "";
   vi.mocked(saveMessages).mockResolvedValue();
