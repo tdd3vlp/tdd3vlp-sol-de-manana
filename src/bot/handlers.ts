@@ -283,7 +283,7 @@ export function assembleMessage(
       const bolded = diffAndBold(userInput, withoutPrefix);
       const prefix =
         response.inputLanguage === "spanish" ? "Corrección:" : "En español:";
-      correction = bolded ? `${prefix} ${bolded}` : "";
+      correction = (bolded && meaningful(bolded)) ? `${prefix} ${bolded}` : "";
     } else {
       correction = plain;
     }
