@@ -26,8 +26,8 @@ export async function createYookassaPayment(
 ): Promise<YooKassaPayment> {
   const rubles = (PLAN_PRICES_RUB[plan] / 100).toFixed(2);
   const labels: Record<PaidPlan, string> = {
-    basic: "Sol de Mañana — подписка Basic на 30 дней",
-    premium: "Sol de Mañana — подписка Premium на 30 дней",
+    basic: "Sol de Manana, подписка Basic на 30 дней",
+    premium: "Sol de Manana, подписка Premium на 30 дней",
   };
 
   const body: Record<string, unknown> = {
