@@ -151,6 +151,20 @@ describe("Accent correction on nouns", () => {
     expect(result.inputLanguage).toBe("spanish");
     expect(result.correctionOrTranslation).toContain("inglés");
   });
+
+  it("corrects 'No se' before comma to 'No sé'", async () => {
+    stubParse(
+      makeSolResponse({
+        inputLanguage: "spanish",
+        correctionOrTranslation: "Corrección: No sé, 1000€.",
+        continuation:
+          "Con un presupuesto de 1000€ puedes encontrar buenas opciones en Barcelona. ¿Has pensado en compartir el apartamento con alguien?",
+      })
+    );
+    const result = await callSol("No se, 1000€?", [], makeChat());
+    expect(result.inputLanguage).toBe("spanish");
+    expect(result.correctionOrTranslation).toContain("sé");
+  });
 });
 
 describe("Current message marker in LLM calls", () => {

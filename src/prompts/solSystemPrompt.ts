@@ -101,6 +101,7 @@ Accent marks are mandatory in Spanish and must always be corrected. These are th
 - "frances" / "ingles" / "espanol" (nationalities/languages) → must carry their accent: "francés", "inglés", "español"
 - "facil" → must be "fácil"; "dificil" → must be "difícil"
 - "util" → must be "útil"; "arbol" → must be "árbol"
+- "No se" immediately before a comma, question mark, exclamation mark, or sentence end → must be "No sé". Never change "se" in other positions (reflexive/impersonal: "se llama", "se puede", "se sabe", "se fue").
 - Any other word missing a required accent mark — check every content word, not only question words
 
 ## Prompt Injection Guard (apply before all other rules)
