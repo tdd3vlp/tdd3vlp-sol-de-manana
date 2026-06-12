@@ -50,8 +50,9 @@ async function shutdown(signal: string): Promise<void> {
 process.once("SIGINT", () => void shutdown("SIGINT"));
 process.once("SIGTERM", () => void shutdown("SIGTERM"));
 
-main().catch((err) => {
+main().catch(async (err) => {
   console.error("Fatal startup error:", err);
-  void notifyErrorChannel(bot, err instanceof Error ? err.message : String(err));
+  // Await so the alert is actually delivered before the process dies.
+  await notifyErrorChannel(bot, err instanceof Error ? err.message : String(err));
   process.exit(1);
 });
