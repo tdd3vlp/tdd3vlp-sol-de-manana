@@ -171,7 +171,7 @@ async function createAndSendYooKassaLink(
     if (!confirmationUrl) throw new Error("ЮKassa did not return confirmation_url");
 
     await ctx.reply(
-      `${labels[plan]} — ${rubles} ₽ на 30 дней.\nОплата через ЮKassa: СБП, T-Pay, карта и другие способы.`,
+      `${labels[plan]} — ${rubles} ₽ на 30 дней.\nОплата через ЮKassa: карта, СБП и другие способы.`,
       { reply_markup: new InlineKeyboard().url(`Оплатить ${rubles} ₽`, confirmationUrl) },
     );
   } catch (error) {
@@ -197,7 +197,7 @@ async function sendPaymentMethodPicker(
     reply_markup: new InlineKeyboard()
       .text("Stars с автопродлением", `pay:${plan}:stars`)
       .row()
-      .text("Карта / СБП / T-Pay на 30 дней", `pay:${plan}:yookassa`),
+      .text("Карта / СБП на 30 дней", `pay:${plan}:yookassa`),
   });
 }
 
