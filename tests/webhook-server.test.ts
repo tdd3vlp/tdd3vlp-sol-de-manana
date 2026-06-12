@@ -218,6 +218,27 @@ describe("webhook server", () => {
     );
   });
 
+  it("alerts the error channel on unexpected currency (no upgrade applied)", async () => {
+    mockGetPayment.mockResolvedValueOnce({
+      id: "pay-1",
+      status: "succeeded",
+      amount: { value: "299.00", currency: "USD" },
+      metadata: { telegramChatId: "42", plan: "basic" },
+    });
+    const res = await req(
+      port,
+      "POST",
+      "/webhooks/yookassa/test-secret-token",
+      JSON.stringify({ event: "payment.succeeded", object: { id: "pay-1" } }),
+    );
+    expect(res.status).toBe(200);
+    expect(mockRecordPayment).not.toHaveBeenCalled();
+    expect(mockNotifyError).toHaveBeenCalledWith(
+      mockBot,
+      expect.stringContaining("currency"),
+    );
+  });
+
   it("alerts the error channel on invalid metadata (no upgrade applied)", async () => {
     mockGetPayment.mockResolvedValueOnce({
       id: "pay-1",
