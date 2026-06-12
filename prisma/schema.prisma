@@ -34,6 +34,11 @@ model Payment {
   isRecurring             Boolean   @default(false)
   expiresAt               DateTime?
   createdAt               DateTime  @default(now())
+  // Added in migration add_yookassa_direct: "telegram" for Stars/old provider-token
+  // payments; "yookassa" for direct API payments. providerPaymentId holds the
+  // ЮKassa payment.id (telegramPaymentChargeId contains "yk:<id>" for these rows).
+  paymentProvider         String    @default("telegram")
+  providerPaymentId       String?
 }
 
 model Message {

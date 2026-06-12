@@ -14,8 +14,19 @@ vi.mock("../src/config/env.js", () => ({
     webAppUrl: "",
     yookassaProviderToken: "",
     yookassaSendReceipt: false,
+    yookassaShopId: "",
+    yookassaSecretKey: "",
+    yookassaWebhookToken: "",
+    port: 3001,
+    publicBaseUrl: "",
+    telegramBotUrl: "",
+    errorChannelId: "",
     adminTelegramIds: [],
   },
+}));
+
+vi.mock("../src/payments/yookassaClient.js", () => ({
+  createYookassaPayment: vi.fn(),
 }));
 
 vi.mock("../src/db/chatHistory.js", () => ({
@@ -84,6 +95,7 @@ import {
 } from "../src/bot/handlers.js";
 import { config } from "../src/config/env.js";
 import { recordPaymentAndUpgradeOnce } from "../src/db/payments.js";
+import { createYookassaPayment } from "../src/payments/yookassaClient.js";
 
 function makeCtx(opts: { chatId?: number; text?: string } = {}): Context {
   return {
@@ -108,6 +120,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   (config as { yookassaProviderToken: string }).yookassaProviderToken = "";
   (config as { yookassaSendReceipt: boolean }).yookassaSendReceipt = false;
+  (config as { yookassaShopId: string }).yookassaShopId = "";
+  (config as { yookassaSecretKey: string }).yookassaSecretKey = "";
   vi.mocked(saveMessages).mockResolvedValue();
   vi.mocked(getRecentMessages).mockResolvedValue([]);
   vi.mocked(refundDailyMessage).mockResolvedValue();
@@ -238,39 +252,40 @@ describe("handleStart", () => {
     expect(call[5]).toEqual([{ label: expect.stringContaining("Premium"), amount: 600 }]);
   });
 
-  it("shows the payment method picker for pay_basic deep link when YooKassa is configured", async () => {
-    (config as { yookassaProviderToken: string }).yookassaProviderToken =
-      "yookassa-token";
+  it("shows the payment method picker for pay_basic deep link when ЮKassa is configured", async () => {
+    (config as { yookassaShopId: string }).yookassaShopId = "shop-id";
     const ctx = makeCtx();
     (ctx as { match?: string }).match = "pay_basic";
 
     await handleStart(ctx);
 
     expect(resetChat).not.toHaveBeenCalled();
-    expect(ctx.api.sendInvoice).not.toHaveBeenCalled();
     expect(ctx.reply).toHaveBeenCalledWith(
       expect.stringContaining("Basic"),
       expect.objectContaining({ reply_markup: expect.any(Object) }),
     );
   });
 
-  it("sends a YooKassa invoice for pay_premium_yookassa deep link", async () => {
-    (config as { yookassaProviderToken: string }).yookassaProviderToken =
-      "yookassa-token";
+  it("sends a ЮKassa direct payment for pay_premium_yookassa deep link", async () => {
+    (config as { yookassaShopId: string }).yookassaShopId = "shop-id";
+    (config as { yookassaSecretKey: string }).yookassaSecretKey = "secret";
+    vi.mocked(createYookassaPayment).mockResolvedValueOnce({
+      id: "pay-1",
+      status: "pending",
+      amount: { value: "899.00", currency: "RUB" },
+      metadata: { telegramChatId: "12345", plan: "premium" },
+      confirmation: { type: "redirect", confirmation_url: "https://yookassa.ru/pay/abc" },
+    });
     const ctx = makeCtx();
     (ctx as { match?: string }).match = "pay_premium_yookassa";
 
     await handleStart(ctx);
 
     expect(resetChat).not.toHaveBeenCalled();
-    expect(ctx.api.sendInvoice).toHaveBeenCalledWith(
-      12345,
-      expect.stringContaining("Premium"),
-      expect.any(String),
-      "plan:premium:yookassa",
-      "RUB",
-      [{ label: expect.stringContaining("Premium"), amount: 89900 }],
-      { provider_token: "yookassa-token" },
+    expect(createYookassaPayment).toHaveBeenCalledWith("premium", "12345");
+    expect(ctx.reply).toHaveBeenCalledWith(
+      expect.stringContaining("899"),
+      expect.objectContaining({ reply_markup: expect.any(Object) }),
     );
   });
 
@@ -291,9 +306,8 @@ describe("handleStart", () => {
 // ── payment callbacks ───────────────────────────────────────────────────────
 
 describe("handleDirectPayCallback", () => {
-  it("shows payment method choices when YooKassa is configured", async () => {
-    (config as { yookassaProviderToken: string }).yookassaProviderToken =
-      "yookassa-token";
+  it("shows payment method choices when ЮKassa is configured", async () => {
+    (config as { yookassaShopId: string }).yookassaShopId = "shop-id";
     const ctx = makeCtx();
     (ctx as { callbackQuery?: unknown }).callbackQuery = { data: "pay:basic" };
 
@@ -302,15 +316,20 @@ describe("handleDirectPayCallback", () => {
     expect(ctx.answerCallbackQuery).toHaveBeenCalledOnce();
     expect(ctx.reply).toHaveBeenCalledWith(
       expect.stringContaining("Basic"),
-      expect.objectContaining({
-        reply_markup: expect.any(Object),
-      }),
+      expect.objectContaining({ reply_markup: expect.any(Object) }),
     );
   });
 
-  it("sends a YooKassa invoice in RUB for card/SBP payments", async () => {
-    (config as { yookassaProviderToken: string }).yookassaProviderToken =
-      "yookassa-token";
+  it("sends a ЮKassa direct payment URL for card/СБП payments", async () => {
+    (config as { yookassaShopId: string }).yookassaShopId = "shop-id";
+    (config as { yookassaSecretKey: string }).yookassaSecretKey = "secret";
+    vi.mocked(createYookassaPayment).mockResolvedValueOnce({
+      id: "pay-2",
+      status: "pending",
+      amount: { value: "899.00", currency: "RUB" },
+      metadata: { telegramChatId: "12345", plan: "premium" },
+      confirmation: { type: "redirect", confirmation_url: "https://yookassa.ru/pay/def" },
+    });
     const ctx = makeCtx();
     (ctx as { callbackQuery?: unknown }).callbackQuery = {
       data: "pay:premium:yookassa",
@@ -318,52 +337,18 @@ describe("handleDirectPayCallback", () => {
 
     await handleDirectPayCallback(ctx);
 
-    expect(ctx.api.sendInvoice).toHaveBeenCalledWith(
-      12345,
-      expect.stringContaining("Premium"),
-      expect.stringContaining("СберПэй"),
-      "plan:premium:yookassa",
-      "RUB",
-      [{ label: expect.stringContaining("Premium"), amount: 89900 }],
-      { provider_token: "yookassa-token" },
+    expect(createYookassaPayment).toHaveBeenCalledWith("premium", "12345");
+    expect(ctx.reply).toHaveBeenCalledWith(
+      expect.stringContaining("899"),
+      expect.objectContaining({ reply_markup: expect.any(Object) }),
     );
-  });
-
-  it("attaches receipt data when YOOKASSA_SEND_RECEIPT is enabled", async () => {
-    (config as { yookassaProviderToken: string }).yookassaProviderToken =
-      "yookassa-token";
-    (config as { yookassaSendReceipt: boolean }).yookassaSendReceipt = true;
-    const ctx = makeCtx();
-    (ctx as { callbackQuery?: unknown }).callbackQuery = {
-      data: "pay:basic:yookassa",
-    };
-
-    await handleDirectPayCallback(ctx);
-
-    const options = vi.mocked(ctx.api.sendInvoice).mock.calls[0][6] as {
-      need_email?: boolean;
-      send_email_to_provider?: boolean;
-      provider_data?: string;
-    };
-    expect(options.need_email).toBe(true);
-    expect(options.send_email_to_provider).toBe(true);
-    const providerData = JSON.parse(options.provider_data ?? "{}");
-    expect(providerData.receipt.items).toEqual([
-      expect.objectContaining({
-        quantity: "1.00",
-        amount: { value: "299.00", currency: "RUB" },
-        vat_code: 1,
-        payment_mode: "full_payment",
-        payment_subject: "service",
-      }),
-    ]);
   });
 });
 
 // ── handlePreCheckout ───────────────────────────────────────────────────────
 
 describe("handlePreCheckout", () => {
-  it("accepts a valid YooKassa pre-checkout query", async () => {
+  it("rejects any RUB pre-checkout (ЮKassa now uses direct API, not Telegram Payments)", async () => {
     const ctx = makeCtx();
     (ctx as { preCheckoutQuery?: unknown }).preCheckoutQuery = {
       invoice_payload: "plan:basic:yookassa",
@@ -373,22 +358,9 @@ describe("handlePreCheckout", () => {
 
     await handlePreCheckout(ctx);
 
-    expect(ctx.answerPreCheckoutQuery).toHaveBeenCalledWith(true);
-  });
-
-  it("rejects a YooKassa pre-checkout query with a wrong amount", async () => {
-    const ctx = makeCtx();
-    (ctx as { preCheckoutQuery?: unknown }).preCheckoutQuery = {
-      invoice_payload: "plan:basic:yookassa",
-      currency: "RUB",
-      total_amount: 1,
-    };
-
-    await handlePreCheckout(ctx);
-
     expect(ctx.answerPreCheckoutQuery).toHaveBeenCalledWith(
       false,
-      expect.stringContaining("Не удалось"),
+      expect.stringContaining("ЮKassa"),
     );
   });
 });
@@ -460,32 +432,8 @@ describe("handleSuccessfulPayment", () => {
     );
   });
 
-  it("activates YooKassa payments for 30 days", async () => {
-    const now = new Date("2026-06-11T12:00:00.000Z");
-    vi.useFakeTimers();
-    vi.setSystemTime(now);
-    const ctx = makePaymentCtx({
-      invoice_payload: "plan:premium:yookassa",
-      total_amount: 89900,
-      currency: "RUB",
-      telegram_payment_charge_id: "charge-rub-1",
-      provider_payment_charge_id: "yookassa-payment-1",
-    });
-
-    await handleSuccessfulPayment(ctx);
-
-    expect(recordPaymentAndUpgradeOnce).toHaveBeenCalledWith(
-      expect.objectContaining({
-        plan: "premium",
-        amount: 89900,
-        currency: "RUB",
-        providerPaymentChargeId: "yookassa-payment-1",
-        isRecurring: false,
-        expiresAt: new Date("2026-07-11T12:00:00.000Z"),
-      }),
-    );
-    vi.useRealTimers();
-  });
+  // ЮKassa RUB payments now come via webhook (src/bot/webhookServer.ts),
+  // not through Telegram Payments — covered in webhook-server.test.ts.
 
   it("ignores unknown payloads", async () => {
     const ctx = makePaymentCtx({ invoice_payload: "something:else" });

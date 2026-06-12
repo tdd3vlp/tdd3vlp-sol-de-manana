@@ -12,6 +12,8 @@ export interface PaymentRecord {
   providerPaymentChargeId: string | null;
   isRecurring: boolean;
   expiresAt: Date | null;
+  paymentProvider?: string;
+  providerPaymentId?: string | null;
 }
 
 // Records a successful payment and activates the plan in one transaction:
@@ -38,4 +40,30 @@ export async function recordPaymentAndUpgradeOnce(
     }
     throw error;
   }
+}
+
+// Records a ЮKassa direct API payment. Idempotency is enforced via the unique
+// constraint on telegramPaymentChargeId using a "yk:<id>" prefix, so concurrent
+// webhook deliveries of the same payment are handled identically to Telegram payments.
+export async function recordYooKassaPaymentAndUpgradeOnce(opts: {
+  telegramChatId: string;
+  plan: string;
+  yookassaPaymentId: string;
+  amountKopecks: number;
+  expiresAt: Date | null;
+}): Promise<Chat | null> {
+  return recordPaymentAndUpgradeOnce({
+    telegramChatId: opts.telegramChatId,
+    plan: opts.plan,
+    amount: opts.amountKopecks,
+    currency: "RUB",
+    // "yk:" prefix guarantees no collision with real Telegram charge IDs and
+    // still satisfies the @unique constraint for idempotent deduplication.
+    telegramPaymentChargeId: `yk:${opts.yookassaPaymentId}`,
+    providerPaymentChargeId: null,
+    isRecurring: false,
+    expiresAt: opts.expiresAt,
+    paymentProvider: "yookassa",
+    providerPaymentId: opts.yookassaPaymentId,
+  });
 }
