@@ -22,9 +22,9 @@ export class SolServiceError extends Error {
   }
 }
 
-// Converts null-like strings ("/null/", ":null", empty) to actual null.
+// Converts null-like strings and enum echoes ("/spanish") to actual null.
 // Applied only to correctionOrTranslation — a nullable field by contract.
-const NULL_LIKE_RE = /^[/:]?null[/,.:;]?$/i;
+const NULL_LIKE_RE = /^[/:]?(?:null|spanish|russian|mixed|unsupported|nonsense)[/,.:;]?$/i;
 function normalizeNullableCorrection(s: string | null): string | null {
   if (s === null || s === "" || NULL_LIKE_RE.test(s)) return null;
   return s;
@@ -80,12 +80,32 @@ function hasCyrillicCorrection(r: SolResponse): boolean {
   );
 }
 
+// The field must contain only the corrected sentence, never an explanation.
+// Phrases like "no es correcto", "debe ser", "la forma correcta" mean the model
+// added meta-commentary instead of returning the corrected text alone.
+const EXPLANATORY_MARKER_RE =
+  /\b(no es correcto|no es la forma correcta|es incorrecto|debe ser|debería ser|lo correcto es|la forma correcta|se dice|en su lugar)\b/i;
+
+function hasExplanatoryCorrection(r: SolResponse): boolean {
+  return (
+    typeof r.correctionOrTranslation === "string" &&
+    EXPLANATORY_MARKER_RE.test(r.correctionOrTranslation)
+  );
+}
+
 const GENERIC_REPAIR_INSTRUCTION = `Your previous response was invalid. Respond again with valid JSON that strictly matches the required schema. The <${CURRENT_MESSAGE_TAG}> above is still the only user input to process.`;
 
 const CYRILLIC_REPAIR_INSTRUCTION = [
   "Your previous response was invalid. correctionOrTranslation contained Cyrillic characters.",
   `Re-process only the text inside <${CURRENT_MESSAGE_TAG}> above.`,
   "correctionOrTranslation must be entirely in Spanish, with zero Cyrillic characters.",
+  "Return valid JSON matching the schema.",
+].join("\n");
+
+const EXPLANATORY_REPAIR_INSTRUCTION = [
+  "Your previous response was invalid. correctionOrTranslation must contain only the corrected sentence after the prefix.",
+  "Do not explain the mistake. Do not use phrases like 'no es correcto', 'debe ser', 'la forma correcta'.",
+  "Correct example: \"Corrección: Mi hijo, mi esposa y yo.\"",
   "Return valid JSON matching the schema.",
 ].join("\n");
 
@@ -111,6 +131,11 @@ function validateSemantics(r: SolResponse): void {
     throw new SemanticValidationError(
       "Semantic validation: cyrillic in correctionOrTranslation",
       CYRILLIC_REPAIR_INSTRUCTION,
+    );
+  if (hasExplanatoryCorrection(r))
+    throw new SemanticValidationError(
+      "Semantic validation: explanatory text in correctionOrTranslation",
+      EXPLANATORY_REPAIR_INSTRUCTION,
     );
 }
 

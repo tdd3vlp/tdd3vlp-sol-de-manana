@@ -228,6 +228,59 @@ describe("Current message marker in LLM calls", () => {
   });
 });
 
+describe("Semantic guard — explanatory correction", () => {
+  it("retries when correctionOrTranslation contains 'debe ser' and returns clean result", async () => {
+    const dirty = makeSolResponse({
+      inputLanguage: "spanish",
+      correctionOrTranslation:
+        "Corrección: Mi, mi hijo y mi esposa no es correcto. Debe ser: Mi hijo, mi esposa y yo.",
+      continuation:
+        "Es muy bonito tener una familia unida. ¿Prefieres un apartamento con más habitaciones?",
+    });
+    const clean = makeSolResponse({
+      inputLanguage: "spanish",
+      correctionOrTranslation: "Corrección: Mi hijo, mi esposa y yo.",
+      continuation:
+        "Es muy bonito tener una familia unida. ¿Prefieres un apartamento con más habitaciones?",
+    });
+    vi.mocked(openai.beta.chat.completions.parse)
+      .mockResolvedValueOnce({
+        choices: [{ message: { parsed: dirty } }],
+      } as Awaited<ReturnType<typeof openai.beta.chat.completions.parse>>)
+      .mockResolvedValueOnce({
+        choices: [{ message: { parsed: clean } }],
+      } as Awaited<ReturnType<typeof openai.beta.chat.completions.parse>>);
+
+    const result = await callSol("Mi, mi hijo y mi esposa.", [], makeChat());
+    expect(openai.beta.chat.completions.parse).toHaveBeenCalledTimes(2);
+    expect(result.correctionOrTranslation).toBe("Corrección: Mi hijo, mi esposa y yo.");
+  });
+
+  it("retries when correctionOrTranslation contains 'no es correcto'", async () => {
+    const dirty = makeSolResponse({
+      inputLanguage: "spanish",
+      correctionOrTranslation: "Corrección: Esta frase no es correcto. La forma correcta es: Esta frase no es correcta.",
+      continuation: "Sigue practicando. ¿Puedes intentarlo de nuevo?",
+    });
+    const clean = makeSolResponse({
+      inputLanguage: "spanish",
+      correctionOrTranslation: "Corrección: Esta frase no es correcta.",
+      continuation: "Sigue practicando. ¿Puedes intentarlo de nuevo?",
+    });
+    vi.mocked(openai.beta.chat.completions.parse)
+      .mockResolvedValueOnce({
+        choices: [{ message: { parsed: dirty } }],
+      } as Awaited<ReturnType<typeof openai.beta.chat.completions.parse>>)
+      .mockResolvedValueOnce({
+        choices: [{ message: { parsed: clean } }],
+      } as Awaited<ReturnType<typeof openai.beta.chat.completions.parse>>);
+
+    const result = await callSol("Esta frase no es correcto.", [], makeChat());
+    expect(openai.beta.chat.completions.parse).toHaveBeenCalledTimes(2);
+    expect(result.correctionOrTranslation).toBe("Corrección: Esta frase no es correcta.");
+  });
+});
+
 describe("LLM failure and retry", () => {
   it("retries once on first failure and returns result on second success", async () => {
     vi.mocked(openai.beta.chat.completions.parse)
