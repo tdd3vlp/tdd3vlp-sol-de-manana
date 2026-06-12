@@ -23,6 +23,8 @@ export function makeChat(overrides: Partial<Chat> = {}): Chat {
     lockTheme: false,
     dailyMessageCount: 0,
     dailyResetAt: new Date(),
+    customerEmail: null,
+    pendingPaymentPlan: null,
     createdAt: new Date(),
     updatedAt: new Date(),
     ...overrides,

@@ -12,9 +12,12 @@ import {
   consumeDailyMessage,
   refundDailyMessage,
   upgradeChatPlan,
+  setAwaitingEmail,
+  saveCustomerEmail,
   type NewMessage,
 } from "../db/chatHistory.js";
 import { recordPaymentAndUpgradeOnce } from "../db/payments.js";
+import { createYookassaPayment } from "../payments/yookassaClient.js";
 import {
   callSol,
   callSolStart,
@@ -51,7 +54,7 @@ const BTN_MODE_TRANSLATION = "Режим перевода";
 const BTN_MODE_DIALOGUE = "Режим диалога";
 const BTN_CUSTOM_TOPIC = "Своя тема";
 
-function buildDialogueKeyboard(plan: string, userId?: string): Keyboard {
+export function buildDialogueKeyboard(plan: string, userId?: string): Keyboard {
   const kb = new Keyboard().text(BTN_TOPIC_MENU);
   if (plan === "premium" || (userId && isAdminUser(userId))) {
     kb.text(BTN_MODE_TRANSLATION);
@@ -99,7 +102,6 @@ async function sendPaywall(ctx: Context, plan = "free"): Promise<void> {
 
 // The only subscription period Telegram allows: 30 days.
 const SUBSCRIPTION_PERIOD_SECONDS = 2592000;
-const ONE_TIME_PAYMENT_PERIOD_MS = SUBSCRIPTION_PERIOD_SECONDS * 1000;
 
 async function sendSubscriptionInvoice(
   ctx: Context,
@@ -126,62 +128,63 @@ async function sendSubscriptionInvoice(
   );
 }
 
-async function sendYooKassaInvoice(
+async function sendYooKassaDirectPayment(
   ctx: Context,
   plan: PaidPlan,
 ): Promise<void> {
-  const chatId = ctx.chat?.id;
-  if (!chatId) return;
-  if (!config.yookassaProviderToken) {
+  const telegramChatId = ctx.chat?.id?.toString();
+  if (!telegramChatId) return;
+
+  if (!config.yookassaShopId || !config.yookassaSecretKey) {
+    await ctx.reply("Оплата картой/СБП пока не настроена. Можно оплатить Stars.");
+    return;
+  }
+
+  const chat = await getOrCreateChat(telegramChatId, pickRandomTheme());
+
+  if (!chat.customerEmail) {
+    await setAwaitingEmail(chat.id, plan);
     await ctx.reply(
-      "Оплата картой/СберПэй пока не настроена. Можно оплатить Stars.",
+      "Для оформления фискального чека укажи email.\nОн будет использован только для отправки чека.",
     );
     return;
   }
 
-  const labels: Record<string, string> = {
-    basic: "Basic — 100 сообщений в день",
-    premium: "Premium — 300 сообщений в день",
+  await createAndSendYooKassaLink(ctx, plan, telegramChatId, chat.customerEmail);
+}
+
+async function createAndSendYooKassaLink(
+  ctx: Context,
+  plan: PaidPlan,
+  telegramChatId: string,
+  customerEmail: string,
+): Promise<void> {
+  const labels: Record<PaidPlan, string> = {
+    basic: "Basic — 100 сообщений/день",
+    premium: "Premium — 300 сообщений/день",
   };
-  const amount = PLAN_PRICES_RUB[plan];
-  // A YooKassa shop with fiscalization enabled (Чеки от ЮKassa, 54-ФЗ)
-  // rejects payments without receipt data and a customer contact.
-  const receiptOptions = config.yookassaSendReceipt
-    ? {
-        need_email: true,
-        send_email_to_provider: true,
-        provider_data: JSON.stringify({
-          receipt: {
-            items: [
-              {
-                description: labels[plan],
-                quantity: "1.00",
-                amount: { value: (amount / 100).toFixed(2), currency: "RUB" },
-                vat_code: 1, // без НДС
-                payment_mode: "full_payment",
-                payment_subject: "service",
-              },
-            ],
-          },
-        }),
-      }
-    : {};
-  await ctx.api.sendInvoice(
-    chatId,
-    labels[plan],
-    "Доступ Sol de Mañana на 30 дней. Оплата картой или через СберПэй.",
-    `plan:${plan}:yookassa`,
-    "RUB",
-    [{ label: labels[plan], amount }],
-    { provider_token: config.yookassaProviderToken, ...receiptOptions },
-  );
+  const rubles = PLAN_PRICES_RUB[plan] / 100;
+
+  try {
+    const payment = await createYookassaPayment(plan, telegramChatId, customerEmail);
+    const confirmationUrl = payment.confirmation.confirmation_url;
+    if (!confirmationUrl) throw new Error("ЮKassa did not return confirmation_url");
+
+    await ctx.reply(
+      `${labels[plan]} — ${rubles} ₽ на 30 дней.\nОплата через ЮKassa: карта, СБП и другие способы.`,
+      { reply_markup: new InlineKeyboard().url(`Оплатить ${rubles} ₽`, confirmationUrl) },
+    );
+  } catch (error) {
+    console.error("Failed to create ЮKassa payment:", error);
+    await ctx.reply("Не удалось создать платёж. Попробуй позже или оплати Stars.");
+  }
 }
 
 async function sendPaymentMethodPicker(
   ctx: Context,
   plan: PaidPlan,
 ): Promise<void> {
-  if (!config.yookassaProviderToken) {
+  if (!config.yookassaShopId) {
     await sendSubscriptionInvoice(ctx, plan);
     return;
   }
@@ -194,7 +197,7 @@ async function sendPaymentMethodPicker(
     reply_markup: new InlineKeyboard()
       .text("Stars с автопродлением", `pay:${plan}:stars`)
       .row()
-      .text("Карта/СберПэй на 30 дней", `pay:${plan}:yookassa`),
+      .text("Карта / СБП на 30 дней", `pay:${plan}:yookassa`),
   });
 }
 
@@ -416,7 +419,7 @@ export async function handleStart(ctx: Context): Promise<void> {
   if (payMatch) {
     const plan = payMatch[1] as PaidPlan;
     if (payMatch[2]) {
-      await sendYooKassaInvoice(ctx, plan);
+      await sendYooKassaDirectPayment(ctx, plan);
     } else {
       await sendPaymentMethodPicker(ctx, plan);
     }
@@ -746,6 +749,33 @@ export async function handleTopicCallback(ctx: Context): Promise<void> {
   }
 }
 
+// ─── Email collection for ЮKassa receipts ────────────────────────────────────
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+async function handleEmailInput(
+  ctx: Context,
+  userText: string,
+  chat: Awaited<ReturnType<typeof getOrCreateChat>>,
+  telegramChatId: string,
+): Promise<void> {
+  const email = userText.trim();
+  if (!EMAIL_RE.test(email)) {
+    await ctx.reply("Некорректный email. Попробуй ещё раз, например: ivan@example.com");
+    return;
+  }
+
+  const plan = chat.pendingPaymentPlan as PaidPlan | null;
+  if (!plan || (plan !== "basic" && plan !== "premium")) {
+    await saveCustomerEmail(chat.id, email);
+    await ctx.reply("Email сохранён. Нажми кнопку оплаты ещё раз.");
+    return;
+  }
+
+  await saveCustomerEmail(chat.id, email);
+  await createAndSendYooKassaLink(ctx, plan, telegramChatId, email);
+}
+
 // ─── Main message handler ─────────────────────────────────────────────────────
 
 export async function handleMessage(ctx: Context): Promise<void> {
@@ -783,6 +813,11 @@ export async function handleMessage(ctx: Context): Promise<void> {
 
   if (chat.mode === "awaiting_custom_topic") {
     await handleCustomTopicInput(ctx, userText, chat, telegramUserId);
+    return;
+  }
+
+  if (chat.mode === "awaiting_email") {
+    await handleEmailInput(ctx, userText, chat, telegramChatId);
     return;
   }
 
@@ -903,23 +938,31 @@ export async function handleDirectPayCallback(ctx: Context): Promise<void> {
     return;
   }
   if (method === "yookassa") {
-    await sendYooKassaInvoice(ctx, plan);
+    await sendYooKassaDirectPayment(ctx, plan);
   }
 }
 
 export async function handlePreCheckout(ctx: Context): Promise<void> {
   const query = ctx.preCheckoutQuery;
   console.log("pre_checkout_query received:", JSON.stringify(query));
+
+  // ЮKassa direct API payments bypass Telegram Payments entirely — reject stale
+  // RUB invoices (created before the migration to the direct API).
+  if (query?.currency === "RUB") {
+    await ctx.answerPreCheckoutQuery(
+      false,
+      "Оплата картой теперь проходит напрямую через ЮKassa. Оформи подписку заново.",
+    );
+    return;
+  }
+
   const payload = parsePaymentPayload(query?.invoice_payload);
   const valid =
     !!query &&
     !!payload &&
-    ((payload.method === "stars" &&
-      query.currency === "XTR" &&
-      query.total_amount === PLAN_PRICES_STARS[payload.plan]) ||
-      (payload.method === "yookassa" &&
-        query.currency === "RUB" &&
-        query.total_amount === PLAN_PRICES_RUB[payload.plan]));
+    payload.method === "stars" &&
+    query.currency === "XTR" &&
+    query.total_amount === PLAN_PRICES_STARS[payload.plan];
 
   if (valid) {
     await ctx.answerPreCheckoutQuery(true);
@@ -938,15 +981,12 @@ export async function handleSuccessfulPayment(ctx: Context): Promise<void> {
   const telegramChatId = ctx.chat?.id?.toString();
   if (!payment || !payload || !telegramChatId) return;
 
-  // Defense in depth: pre-checkout already validated this, but the payment
-  // handler must not trust that an invoice and its payload never diverge.
+  // Defense in depth: pre-checkout already validated this. Only Stars (XTR) comes
+  // through Telegram Payments — RUB is handled by ЮKassa webhook instead.
   const validPayment =
-    (payload.method === "stars" &&
-      payment.currency === "XTR" &&
-      payment.total_amount === PLAN_PRICES_STARS[payload.plan]) ||
-    (payload.method === "yookassa" &&
-      payment.currency === "RUB" &&
-      payment.total_amount === PLAN_PRICES_RUB[payload.plan]);
+    payload.method === "stars" &&
+    payment.currency === "XTR" &&
+    payment.total_amount === PLAN_PRICES_STARS[payload.plan];
   if (!validPayment) {
     console.error(
       "successful_payment with unexpected currency/amount:",
@@ -955,13 +995,10 @@ export async function handleSuccessfulPayment(ctx: Context): Promise<void> {
     return;
   }
 
-  // Telegram sends successful_payment for the initial purchase and for every
-  // auto-renewal; subscription_expiration_date moves forward each cycle.
+  // Stars subscriptions always carry subscription_expiration_date (initial and renewals).
   const expiresAt = payment.subscription_expiration_date
     ? new Date(payment.subscription_expiration_date * 1000)
-    : payload.method === "yookassa"
-      ? new Date(Date.now() + ONE_TIME_PAYMENT_PERIOD_MS)
-      : null;
+    : null;
 
   const upgraded = await recordPaymentAndUpgradeOnce({
     telegramChatId,

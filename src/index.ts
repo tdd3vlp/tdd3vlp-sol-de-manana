@@ -1,15 +1,29 @@
 import { Bot } from "grammy";
 import { config } from "./config/env.js";
 import { registerCommands } from "./bot/commands.js";
+import { startWebhookServer } from "./bot/webhookServer.js";
 import { prisma } from "./db/prisma.js";
 
 const bot = new Bot(config.telegramBotToken);
 
 registerCommands(bot);
 
+async function notifyErrorChannel(message: string): Promise<void> {
+  if (!config.errorChannelId) return;
+  try {
+    await bot.api.sendMessage(config.errorChannelId, `❌ Sol error: ${message}`);
+  } catch {
+    // Alerting must never crash the process itself.
+  }
+}
+
 bot.catch((err) => {
+  const message = err.error instanceof Error ? err.error.message : String(err.error);
   console.error("Bot error:", err.error);
+  void notifyErrorChannel(message);
 });
+
+const server = startWebhookServer(bot);
 
 async function main() {
   if (config.webAppUrl) {
@@ -30,6 +44,12 @@ async function main() {
 
 async function shutdown(signal: string): Promise<void> {
   console.log(`Received ${signal}, shutting down...`);
+  // Force exit after 30 s to prevent hung shutdown.
+  setTimeout(() => {
+    console.error("Graceful shutdown timed out, forcing exit.");
+    process.exit(1);
+  }, 30_000).unref();
+  server.close();
   await bot.stop();
   await prisma.$disconnect();
   process.exit(0);
@@ -38,4 +58,8 @@ async function shutdown(signal: string): Promise<void> {
 process.once("SIGINT", () => void shutdown("SIGINT"));
 process.once("SIGTERM", () => void shutdown("SIGTERM"));
 
-main().catch(console.error);
+main().catch((err) => {
+  console.error("Fatal startup error:", err);
+  void notifyErrorChannel(err instanceof Error ? err.message : String(err));
+  process.exit(1);
+});
