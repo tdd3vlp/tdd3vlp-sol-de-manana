@@ -2,25 +2,17 @@ import { Bot } from "grammy";
 import { config } from "./config/env.js";
 import { registerCommands } from "./bot/commands.js";
 import { startWebhookServer } from "./bot/webhookServer.js";
+import { notifyErrorChannel } from "./bot/errorNotifier.js";
 import { prisma } from "./db/prisma.js";
 
 const bot = new Bot(config.telegramBotToken);
 
 registerCommands(bot);
 
-async function notifyErrorChannel(message: string): Promise<void> {
-  if (!config.errorChannelId) return;
-  try {
-    await bot.api.sendMessage(config.errorChannelId, `❌ Sol error: ${message}`);
-  } catch {
-    // Alerting must never crash the process itself.
-  }
-}
-
 bot.catch((err) => {
   const message = err.error instanceof Error ? err.error.message : String(err.error);
   console.error("Bot error:", err.error);
-  void notifyErrorChannel(message);
+  void notifyErrorChannel(bot, message);
 });
 
 const server = startWebhookServer(bot);
@@ -60,6 +52,6 @@ process.once("SIGTERM", () => void shutdown("SIGTERM"));
 
 main().catch((err) => {
   console.error("Fatal startup error:", err);
-  void notifyErrorChannel(err instanceof Error ? err.message : String(err));
+  void notifyErrorChannel(bot, err instanceof Error ? err.message : String(err));
   process.exit(1);
 });
