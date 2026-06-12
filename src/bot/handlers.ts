@@ -67,6 +67,8 @@ const translationReplyKeyboard = new Keyboard()
   .resized()
   .persistent();
 
+const LLM_NULL_ARTIFACT_RE = /^[/:]?(?:null|spanish|russian|mixed|unsupported|nonsense)[/,.:;]?\s*$/i;
+
 type PaidPlan = "basic" | "premium";
 type PaymentMethod = "stars" | "yookassa";
 
@@ -216,8 +218,7 @@ function meaningful(s: string | null): s is string {
   const t = s.trim().toLowerCase();
   return (
     t.length > 1 &&
-    t !== "null" &&
-    !/^:?null[,.:;]?\s*$/.test(t) &&
+    !LLM_NULL_ARTIFACT_RE.test(t) &&
     /[a-záéíóúüñа-яёА-ЯЁ]/i.test(t)
   );
 }

@@ -105,6 +105,64 @@ describe("assembleMessage — marker tag stripping", () => {
   });
 });
 
+describe("assembleMessage — LLM nullable artifacts", () => {
+  it("does not show slash-prefixed language enum echoes as corrections", () => {
+    const r = makeSolResponse({
+      inputLanguage: "spanish",
+      correctionOrTranslation: "/spanish",
+      continuation:
+        "Barcelona es una ciudad maravillosa con muchas opciones para vivir. ¿Ya has visitado algunas zonas de la ciudad?",
+    });
+    const out = assembleMessage(r, "Barcelona");
+    expect(out).not.toContain("Corrección:");
+    expect(out).not.toContain("/spanish");
+    expect(out).toContain("Barcelona es una ciudad maravillosa");
+  });
+});
+
+describe("assembleMessage — rough user inputs", () => {
+  it("shows a clean No se correction when the LLM provides it", () => {
+    const r = makeSolResponse({
+      inputLanguage: "spanish",
+      correctionOrTranslation: "Corrección: No sé, ¿1000 €?",
+      continuation:
+        "Con ese presupuesto puedes buscar opciones sencillas. Barcelona tiene zonas con precios distintos. ¿Prefieres vivir solo o compartir piso?",
+    });
+    const html = formatForTelegram(assembleMessage(r, "No se, 1000€?"));
+    expect(html).toContain("Corrección:");
+    expect(html).toContain("<b>sé</b>");
+    expect(html).toContain("1000");
+  });
+
+  it("cannot invent a missing correction when the LLM returns null", () => {
+    const r = makeSolResponse({
+      inputLanguage: "spanish",
+      correctionOrTranslation: null,
+      continuation:
+        "Con un presupuesto de 1000€ puedes encontrar buenas opciones en Barcelona. ¿Has pensado en compartir el apartamento con alguien?",
+    });
+    const out = assembleMessage(r, "No se, 1000€?");
+    expect(out).not.toContain("Corrección:");
+    expect(out).not.toContain("sé");
+    expect(out).toContain("Con un presupuesto de 1000€");
+  });
+
+  it("shows the clean family correction when the LLM provides only the corrected sentence", () => {
+    const r = makeSolResponse({
+      inputLanguage: "spanish",
+      correctionOrTranslation: "Corrección: Mi hijo, mi esposa y yo.",
+      continuation:
+        "Es bonito buscar un lugar para toda la familia. Un piso cómodo puede ayudar mucho al inicio. ¿Cuántas habitaciones necesitáis?",
+    });
+    const out = assembleMessage(r, "Mi, mi hijo y mi esposa");
+    expect(out).toContain("Corrección:");
+    expect(out).toContain("mi esposa");
+    expect(out).toContain("y yo");
+    expect(out).not.toContain("no es correcto");
+    expect(out).not.toContain("Debe ser");
+  });
+});
+
 describe("bold formatting end-to-end (assembleMessage → formatForTelegram)", () => {
   it("renders café correction as <b>café</b> in Telegram HTML", () => {
     const r = makeSolResponse({
