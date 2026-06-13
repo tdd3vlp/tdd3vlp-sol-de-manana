@@ -328,7 +328,6 @@
         display: flex;
         flex-direction: column;
         align-items: center;
-        gap: 5px;
       }
       .challenge-dot {
         width: 32px;
@@ -483,6 +482,13 @@
         background: #efe4d0;
         color: var(--text-sub);
         cursor: default;
+      }
+      .today-hint {
+        margin-top: 10px;
+        font-size: 12px;
+        color: var(--text-sub);
+        text-align: center;
+        line-height: 1.45;
       }
       .highlights {
         margin-top: 14px;
@@ -1013,9 +1019,7 @@
           const dotClasses = ["challenge-dot"];
           if (isCompleted) dotClasses.push("done");
           if (isToday) dotClasses.push("today");
-          dot.innerHTML = `
-            <div class="${dotClasses.join(" ")}">${isCompleted ? "✓" : d}</div>
-            <span class="challenge-day-label">${CHALLENGE_DAY_LABELS[d] || d}</span>`;
+          dot.innerHTML = `<div class="${dotClasses.join(" ")}">${isCompleted ? "✓" : d}</div>`;
           challengeContainer.appendChild(dot);
         }
 
