@@ -21,7 +21,7 @@ async function main() {
   if (config.webAppUrl) {
     try {
       await bot.api.setChatMenuButton({
-        menu_button: { type: "web_app", text: "Sol de Mañana", web_app: { url: config.webAppUrl } },
+        menu_button: { type: "web_app", text: "Menu", web_app: { url: config.webAppUrl } },
       });
       console.log("Web App menu button set.");
     } catch (err) {
