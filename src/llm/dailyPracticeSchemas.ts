@@ -14,7 +14,7 @@ export const DailyPracticeHighlightsSchema = z.object({
   topic: z.string()
     .describe("The main topic practiced today in Russian, e.g. 'Кафе и рестораны'"),
   subtopics: z.array(z.string()).min(1).max(4)
-    .describe("2-4 specific subtopics or phrases practiced, in Russian"),
+    .describe("2-4 high-level topic areas covered in the conversation, in Russian. Each item is a short topic phrase (e.g. 'Описание квартиры', 'Общение с арендодателем') — not a literal phrase from the dialogue."),
   whatWentWell: z.string()
     .describe("What the user did well — 1 sentence in Russian"),
   focusArea: z.string()

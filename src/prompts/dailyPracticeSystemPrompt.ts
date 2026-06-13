@@ -93,7 +93,7 @@ export function buildDialogueHighlightsPrompt(theme: string): string {
 
 Review the conversation above and produce a JSON summary with these fields:
 - topic: the main topic practiced today, stated in Russian (e.g. "Переезд в Испанию")
-- subtopics: array of 2-4 specific subtopics or phrases the user practiced, in Russian
+- subtopics: array of 2-4 high-level topic areas covered in the conversation, in Russian. Short topic phrases only — do not copy phrases or questions from the dialogue (e.g. 'Описание квартиры', 'Общение с хозяином', 'Условия аренды')
 - whatWentWell: one sentence in Russian describing what the user did well (vocabulary, sentence structure, confidence, etc.)
 - focusArea: one sentence in Russian naming the single most important area to improve (a specific grammar point, word, or habit)
 - encouragement: one short encouraging sentence in Russian
@@ -110,7 +110,7 @@ export function buildDailyPracticeFinalePrompt(
 
 Review the conversation above and produce a JSON summary with these fields:
 - topic: the main topic practiced today, stated in Russian (e.g. "Кафе и рестораны")
-- subtopics: array of 2-4 specific subtopics or phrases the user practiced, in Russian (e.g. ["Как сделать заказ", "Как попросить счёт", "Описание блюд"])
+- subtopics: array of 2-4 high-level topic areas covered, in Russian. Short topic phrases only — do not copy phrases or questions from the dialogue (e.g. ["Заказ блюд", "Описание меню", "Оплата счёта"])
 - whatWentWell: one sentence in Russian describing what the user did well (vocabulary, sentence structure, confidence, etc.)
 - focusArea: one sentence in Russian naming the single most important area to improve (a specific grammar point, word, or habit)
 - encouragement: one short encouraging sentence in Russian (e.g. "Сегодня ты отлично поработал!")

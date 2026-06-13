@@ -534,18 +534,23 @@
         color: var(--text-sub);
         text-transform: uppercase;
         letter-spacing: 0.5px;
-        margin-bottom: 6px;
+        margin-bottom: 5px;
+      }
+      .highlights-text {
+        font-size: 13px;
+        color: var(--text);
+        line-height: 1.5;
       }
       .highlights-list {
         list-style: none;
         display: flex;
         flex-direction: column;
-        gap: 5px;
+        gap: 4px;
       }
       .highlights-list li {
         font-size: 13px;
         color: var(--text);
-        line-height: 1.45;
+        line-height: 1.5;
         padding-left: 12px;
         position: relative;
       }
@@ -560,7 +565,6 @@
         margin-top: 12px;
         font-size: 13px;
         color: var(--text-sub);
-        font-style: italic;
         line-height: 1.5;
       }
 
@@ -1072,29 +1076,30 @@
         if (status === "completed" && state.today.highlights) {
           highlightsEl.style.display = "";
           const h = state.today.highlights;
+          function capitalize(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
           let html = "";
           if (h.topic) {
             html += `<div class="highlights-section">
               <div class="highlights-section-title">Тема</div>
-              <div style="padding: 0 0 4px">${escapeHtml(h.topic)}</div>
+              <div class="highlights-text">${escapeHtml(h.topic)}</div>
             </div>`;
           }
           if (h.subtopics && h.subtopics.length > 0) {
             html += `<div class="highlights-section">
               <div class="highlights-section-title">Что практиковал</div>
-              <ul class="highlights-list">${h.subtopics.map(s => `<li>${escapeHtml(s)}</li>`).join("")}</ul>
+              <ul class="highlights-list">${h.subtopics.map(s => `<li>${escapeHtml(capitalize(s))}</li>`).join("")}</ul>
             </div>`;
           }
           if (h.whatWentWell) {
             html += `<div class="highlights-section">
               <div class="highlights-section-title">Хорошо получилось</div>
-              <div style="padding: 0 0 4px">${escapeHtml(h.whatWentWell)}</div>
+              <div class="highlights-text">${escapeHtml(h.whatWentWell)}</div>
             </div>`;
           }
           if (h.focusArea) {
             html += `<div class="highlights-section">
               <div class="highlights-section-title">Над чем поработать</div>
-              <div style="padding: 0 0 4px">${escapeHtml(h.focusArea)}</div>
+              <div class="highlights-text">${escapeHtml(h.focusArea)}</div>
             </div>`;
           }
           if (h.encouragement) {
