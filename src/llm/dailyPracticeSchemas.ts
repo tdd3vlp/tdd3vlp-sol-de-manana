@@ -11,10 +11,12 @@ export const DailyPracticeResponseSchema = z.object({
 export type DailyPracticeResponse = z.infer<typeof DailyPracticeResponseSchema>;
 
 export const DailyPracticeHighlightsSchema = z.object({
-  topic: z.string()
-    .describe("The main topic practiced today in Russian, e.g. 'Кафе и рестораны'"),
-  subtopics: z.array(z.string()).min(1).max(4)
-    .describe("2-4 high-level topic areas covered in the conversation, in Russian. Each item is a short topic phrase (e.g. 'Описание квартиры', 'Общение с арендодателем') — not a literal phrase from the dialogue."),
+  summary: z.string()
+    .describe("2-4 sentences in Russian summarising everything discussed in the conversation. Cover all topics equally — do not pick one as the main topic."),
+  mistakes: z.array(z.string())
+    .describe("Corrections from the conversation, each formatted as 'написал X → правильно Y'. Extract ONLY from explicit 'Corrección:' lines in the assistant messages. Do NOT invent mistakes. Do NOT treat 'En español:' translation lines as mistakes. Empty array [] if no Corrección lines exist."),
+  usefulPhrases: z.array(z.string())
+    .describe("3-5 useful Spanish phrases related to the topics discussed. Fill ONLY if mistakes is empty. If mistakes has any items, use []."),
   whatWentWell: z.string()
     .describe("What the user did well — 1 sentence in Russian"),
   focusArea: z.string()

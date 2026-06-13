@@ -120,8 +120,9 @@ export async function callDailyPractice(
 }
 
 const FALLBACK_HIGHLIGHTS: DailyPracticeHighlights = {
-  topic: "Испанский язык",
-  subtopics: [],
+  summary: "Сегодня прошла хорошая практика испанского языка.",
+  mistakes: [],
+  usefulPhrases: [],
   whatWentWell: "Ты старался и продолжал разговор.",
   focusArea: "Продолжай практиковать акцентные знаки.",
   encouragement: "Отличная работа сегодня!",
@@ -143,7 +144,7 @@ export async function callDialogueHighlights(
       model,
       messages,
       response_format: zodResponseFormat(DailyPracticeHighlightsSchema, "daily_practice_highlights"),
-      max_tokens: 400,
+      max_tokens: 600,
     });
     const parsed = completion.choices[0]?.message?.parsed;
     if (!parsed) return FALLBACK_HIGHLIGHTS;
@@ -160,11 +161,11 @@ export async function callDialogueHighlights(
           {
             role: "user",
             content:
-              "Your previous response was invalid. Return valid JSON matching the required schema with topic, subtopics, whatWentWell, focusArea, and encouragement fields.",
+              "Your previous response was invalid. Return valid JSON matching the required schema with summary, mistakes, usefulPhrases, whatWentWell, focusArea, and encouragement fields.",
           },
         ],
         response_format: zodResponseFormat(DailyPracticeHighlightsSchema, "daily_practice_highlights"),
-        max_tokens: 400,
+        max_tokens: 600,
       });
       return retry.choices[0]?.message?.parsed ?? FALLBACK_HIGHLIGHTS;
     } catch (retryError) {
@@ -194,7 +195,7 @@ export async function callDailyPracticeFinale(
       model,
       messages,
       response_format: zodResponseFormat(DailyPracticeHighlightsSchema, "daily_practice_highlights"),
-      max_tokens: 400,
+      max_tokens: 600,
     });
     const parsed = completion.choices[0]?.message?.parsed;
     if (!parsed) return FALLBACK_HIGHLIGHTS;
@@ -211,11 +212,11 @@ export async function callDailyPracticeFinale(
           {
             role: "user",
             content:
-              "Your previous response was invalid. Return valid JSON matching the required schema with topic, subtopics, whatWentWell, focusArea, and encouragement fields.",
+              "Your previous response was invalid. Return valid JSON matching the required schema with summary, mistakes, usefulPhrases, whatWentWell, focusArea, and encouragement fields.",
           },
         ],
         response_format: zodResponseFormat(DailyPracticeHighlightsSchema, "daily_practice_highlights"),
-        max_tokens: 400,
+        max_tokens: 600,
       });
       return retry.choices[0]?.message?.parsed ?? FALLBACK_HIGHLIGHTS;
     } catch (retryError) {

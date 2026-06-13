@@ -73,11 +73,15 @@ export async function decrementStep(sessionId: string): Promise<PracticeSession>
 }
 
 export interface PracticeHighlights {
-  topic: string;
-  subtopics: string[];
+  summary: string;
+  mistakes: string[];
+  usefulPhrases: string[];
   whatWentWell: string;
   focusArea: string;
   encouragement: string;
+  // legacy fields kept for backward compat with old DB records
+  topic?: string;
+  subtopics?: string[];
 }
 
 export async function completeSession(

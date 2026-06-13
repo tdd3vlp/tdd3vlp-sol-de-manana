@@ -399,8 +399,9 @@ describe("getProgressState", () => {
   it("returns completed status and highlights for a completed session", () => {
     const chat = makeChat({ streakCount: 3, dailyPracticeSentenceCount: 8, dailyPracticeResetAt: new Date() });
     const highlights = {
-      topic: "Directions",
-      subtopics: ["Asking for directions"],
+      summary: "Сегодня говорили о том, как спрашивать дорогу в городе.",
+      mistakes: ["написал al playa → правильно a la playa"],
+      usefulPhrases: [],
       whatWentWell: "Хорошо использовал предлоги",
       focusArea: "Поработать над произношением",
       encouragement: "Отлично!",

@@ -1078,17 +1078,25 @@
           const h = state.today.highlights;
           function capitalize(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
           let html = "";
-          if (h.topic) {
+          if (h.summary) {
             html += `<div class="highlights-section">
-              <div class="highlights-section-title">Тема</div>
-              <div class="highlights-text">${escapeHtml(h.topic)}</div>
+              <div class="highlights-section-title">О чём говорили</div>
+              <div class="highlights-text">${escapeHtml(h.summary)}</div>
             </div>`;
-          }
-          if (h.subtopics && h.subtopics.length > 0) {
-            html += `<div class="highlights-section">
-              <div class="highlights-section-title">Что практиковал</div>
-              <ul class="highlights-list">${h.subtopics.map(s => `<li>${escapeHtml(capitalize(s))}</li>`).join("")}</ul>
-            </div>`;
+          } else {
+            // legacy fallback for old DB records
+            if (h.topic) {
+              html += `<div class="highlights-section">
+                <div class="highlights-section-title">Тема</div>
+                <div class="highlights-text">${escapeHtml(h.topic)}</div>
+              </div>`;
+            }
+            if (h.subtopics && h.subtopics.length > 0) {
+              html += `<div class="highlights-section">
+                <div class="highlights-section-title">Что практиковал</div>
+                <ul class="highlights-list">${h.subtopics.map(s => `<li>${escapeHtml(capitalize(s))}</li>`).join("")}</ul>
+              </div>`;
+            }
           }
           if (h.whatWentWell) {
             html += `<div class="highlights-section">
@@ -1100,6 +1108,17 @@
             html += `<div class="highlights-section">
               <div class="highlights-section-title">Над чем поработать</div>
               <div class="highlights-text">${escapeHtml(h.focusArea)}</div>
+            </div>`;
+          }
+          if (h.mistakes && h.mistakes.length > 0) {
+            html += `<div class="highlights-section">
+              <div class="highlights-section-title">Ошибки</div>
+              <ul class="highlights-list">${h.mistakes.map(m => `<li>${escapeHtml(m)}</li>`).join("")}</ul>
+            </div>`;
+          } else if (h.usefulPhrases && h.usefulPhrases.length > 0) {
+            html += `<div class="highlights-section">
+              <div class="highlights-section-title">Полезные фразы</div>
+              <ul class="highlights-list">${h.usefulPhrases.map(p => `<li>${escapeHtml(p)}</li>`).join("")}</ul>
             </div>`;
           }
           if (h.encouragement) {

@@ -89,11 +89,12 @@ ${SPANISH_LANGUAGE_CLASSIFICATION_RULES}
 
 export function buildDialogueHighlightsPrompt(theme: string): string {
   const safeTheme = sanitizeTheme(theme);
-  return `You are Sol de Mañana. The user just completed their daily practice goal through a natural dialogue session on the theme "${safeTheme}".
+  return `You are Sol de Mañana. The user just completed their daily practice goal through a natural dialogue session (theme: "${safeTheme}").
 
 Review the conversation above and produce a JSON summary with these fields:
-- topic: the main topic practiced today, stated in Russian (e.g. "Переезд в Испанию")
-- subtopics: array of 2-4 high-level topic areas covered in the conversation, in Russian. Short topic phrases only — do not copy phrases or questions from the dialogue (e.g. 'Описание квартиры', 'Общение с хозяином', 'Условия аренды')
+- summary: 2-4 sentences in Russian summarising everything discussed. Cover all topics equally — do not elevate one as the "main" topic.
+- mistakes: array of strings, each formatted "написал X → правильно Y". Extract ONLY from explicit "Corrección:" lines in your own (assistant) messages above. Do NOT invent mistakes. Do NOT treat "En español:" translation lines as mistakes. If no Corrección lines appear in the conversation, use an empty array [].
+- usefulPhrases: array of 3-5 useful Spanish phrases related to the topics discussed. Fill this ONLY if mistakes is empty. If mistakes has any items, use [].
 - whatWentWell: one sentence in Russian describing what the user did well (vocabulary, sentence structure, confidence, etc.)
 - focusArea: one sentence in Russian naming the single most important area to improve (a specific grammar point, word, or habit)
 - encouragement: one short encouraging sentence in Russian
@@ -109,8 +110,9 @@ export function buildDailyPracticeFinalePrompt(
   return `You are Sol de Mañana. This daily practice session on "${dayLabel}" (${safeTheme}) has just ended after ~8 user exchanges.
 
 Review the conversation above and produce a JSON summary with these fields:
-- topic: the main topic practiced today, stated in Russian (e.g. "Кафе и рестораны")
-- subtopics: array of 2-4 high-level topic areas covered, in Russian. Short topic phrases only — do not copy phrases or questions from the dialogue (e.g. ["Заказ блюд", "Описание меню", "Оплата счёта"])
+- summary: 2-4 sentences in Russian summarising everything discussed. Cover all topics equally — do not elevate one as the "main" topic.
+- mistakes: array of strings, each formatted "написал X → правильно Y". Extract ONLY from explicit "Corrección:" lines in your own (assistant) messages above. Do NOT invent mistakes. Do NOT treat "En español:" translation lines as mistakes. If no Corrección lines appear in the conversation, use an empty array [].
+- usefulPhrases: array of 3-5 useful Spanish phrases related to the topics discussed. Fill this ONLY if mistakes is empty. If mistakes has any items, use [].
 - whatWentWell: one sentence in Russian describing what the user did well (vocabulary, sentence structure, confidence, etc.)
 - focusArea: one sentence in Russian naming the single most important area to improve (a specific grammar point, word, or habit)
 - encouragement: one short encouraging sentence in Russian (e.g. "Сегодня ты отлично поработал!")

@@ -44,6 +44,7 @@ import {
   resetDailyPracticeIfNewDay,
   incrementDailySentenceCount,
   markDailyPracticeCompleted,
+  type PracticeHighlights,
 } from "../db/practiceSession.js";
 import { countSentences } from "../conversation/sentenceCounter.js";
 import { buildLLMContext } from "../conversation/context.js";
@@ -880,23 +881,13 @@ function assembleDailyPracticeMessage(
   return parts.join("\n\n").trim();
 }
 
-function buildDailyPracticeFinaleText(highlights: {
-  topic: string;
-  subtopics: string[];
-  whatWentWell: string;
-  focusArea: string;
-  encouragement: string;
-}): string {
+function buildDailyPracticeFinaleText(highlights: PracticeHighlights): string {
   const parts: string[] = ["Практика завершена."];
 
-  if (highlights.topic) {
+  if (highlights.summary) {
+    parts.push(highlights.summary);
+  } else if (highlights.topic) {
     parts.push(`Тема: ${highlights.topic}`);
-  }
-
-  if (highlights.subtopics.length > 0) {
-    parts.push(
-      "Что практиковал:\n" + highlights.subtopics.map((s) => `• ${s}`).join("\n"),
-    );
   }
 
   if (highlights.whatWentWell) {
