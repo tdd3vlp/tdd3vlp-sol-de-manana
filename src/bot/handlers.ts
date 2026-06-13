@@ -1136,6 +1136,7 @@ async function trackDailyPracticeProgress(
   rawSolResponse: string,
   model: string,
   telegramChatId: string,
+  telegramUserId: string | undefined,
   api: SendMessageApi,
 ): Promise<void> {
   try {
@@ -1153,15 +1154,19 @@ async function trackDailyPracticeProgress(
 
     if (updatedChat.dailyPracticeSentenceCount < DAILY_PRACTICE_GOAL) return;
 
+    // Streak first (idempotent via lastStreakDate guard), then mark completion.
+    // If markDailyPracticeCompleted fails after streak update, the next turn
+    // retries: streak guard prevents double-update, mark succeeds, notification sent.
+    const newStreak = await updateStreakAndWeekly(freshChat, chat.id);
+
     const { marked } = await markDailyPracticeCompleted(chat.id);
     if (!marked) return;
 
-    await updateStreakAndWeekly(freshChat, chat.id);
-
-    const newStreak = freshChat.streakCount + 1;
     const completionText =
       `Практика дня выполнена.\n\nТы набрал минимальный ритм на сегодня. Подробная сводка появится в Mini App.\n\nСерия: ${newStreak} ${pluralDays(newStreak)} подряд.`;
-    await api.sendMessage(telegramChatId, completionText);
+    await api.sendMessage(telegramChatId, completionText, {
+      reply_markup: buildDialogueKeyboard(chat.plan, telegramUserId),
+    });
 
     void (async () => {
       try {
@@ -1355,6 +1360,7 @@ export async function handleMessage(ctx: Context): Promise<void> {
       rawText,
       getPlanModel(getEffectivePlan(chat), telegramUserId),
       telegramChatId,
+      telegramUserId,
       ctx.api,
     );
   } catch (error) {

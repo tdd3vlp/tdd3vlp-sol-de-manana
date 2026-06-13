@@ -145,9 +145,9 @@ export async function updateStreakAndWeekly(
   chat: Chat,
   chatId: string,
   now: Date = new Date(),
-): Promise<void> {
+): Promise<number> {
   const today = getTodayDateStringUTC3(now);
-  if (chat.lastStreakDate === today) return; // already counted today
+  if (chat.lastStreakDate === today) return chat.streakCount; // already counted today
 
   const yesterday = getYesterdayDateStringUTC3(now);
   const newStreak = chat.lastStreakDate === yesterday ? chat.streakCount + 1 : 1;
@@ -184,6 +184,7 @@ export async function updateStreakAndWeekly(
       challengeCompletedCount: newChallengeCount,
     },
   });
+  return newStreak;
 }
 
 // ─── Challenge day ─────────────────────────────────────────────────────────────

@@ -4,7 +4,11 @@ import { config } from "../config/env.js";
 
 // Structural subset of grammy's Api so both bot.api and ctx.api fit.
 export interface SendMessageApi {
-  sendMessage(chatId: string | number, text: string): Promise<unknown>;
+  sendMessage(
+    chatId: string | number,
+    text: string,
+    other?: Record<string, unknown>,
+  ): Promise<unknown>;
 }
 
 export async function notifyErrorChannel(
