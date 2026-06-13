@@ -130,10 +130,10 @@ describe("buildDialogueKeyboard", () => {
     ).not.toContain("Практика дня");
   });
 
-  it("shows Практика дня for regular user when showDailyPractice=true", () => {
+  it("does not show Практика дня for regular user even with showDailyPractice=true", () => {
     expect(
       buttonTexts(buildDialogueKeyboard("free", "regular-999", { showDailyPractice: true })),
-    ).toContain("Практика дня");
+    ).not.toContain("Практика дня");
   });
 });
 

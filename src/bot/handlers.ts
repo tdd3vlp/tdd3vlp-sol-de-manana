@@ -81,7 +81,7 @@ export function buildDialogueKeyboard(
   options: { showDailyPractice?: boolean } = {},
 ): Keyboard {
   const showDailyPractice =
-    options.showDailyPractice ?? !!(userId && isBetaUser(userId));
+    !!(userId && isBetaUser(userId)) && options.showDailyPractice !== false;
 
   const kb = new Keyboard().text(BTN_TOPIC_MENU);
   if (plan === "premium" || (userId && isAdminUser(userId))) {
