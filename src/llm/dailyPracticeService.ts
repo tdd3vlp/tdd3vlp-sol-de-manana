@@ -163,7 +163,7 @@ export async function callDailyPracticeFinale(
           {
             role: "user",
             content:
-              "Your previous response was invalid. Return valid JSON matching the required schema with phrases, corrections, and encouragement fields.",
+              "Your previous response was invalid. Return valid JSON matching the required schema with topic, subtopics, whatWentWell, focusArea, and encouragement fields.",
           },
         ],
         response_format: zodResponseFormat(DailyPracticeHighlightsSchema, "daily_practice_highlights"),

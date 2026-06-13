@@ -32,6 +32,7 @@ import {
   getWeekStartDateUTC3,
   getTodaySession,
   createTodaySession,
+  decrementStep,
   updateStreakAndWeekly,
   computeDayNumber,
   getProgressState,
@@ -173,6 +174,31 @@ describe("createTodaySession", () => {
         stepCount: 0,
         status: "active",
       },
+    });
+  });
+});
+
+describe("decrementStep", () => {
+  it("decrements the practice session step count", async () => {
+    const mockSession = {
+      id: "sess-1",
+      chatId: "chat-1",
+      date: getTodayDateStringUTC3(),
+      dayNumber: 1,
+      theme: "family and introductions",
+      stepCount: 2,
+      status: "active",
+      highlights: null,
+      startedAt: new Date(),
+      completedAt: null,
+    };
+    vi.mocked(prisma.practiceSession.update).mockResolvedValue(mockSession);
+
+    await decrementStep("sess-1");
+
+    expect(prisma.practiceSession.update).toHaveBeenCalledWith({
+      where: { id: "sess-1" },
+      data: { stepCount: { decrement: 1 } },
     });
   });
 });

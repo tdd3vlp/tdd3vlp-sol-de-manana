@@ -65,6 +65,13 @@ export async function incrementStep(sessionId: string): Promise<PracticeSession>
   });
 }
 
+export async function decrementStep(sessionId: string): Promise<PracticeSession> {
+  return prisma.practiceSession.update({
+    where: { id: sessionId },
+    data: { stepCount: { decrement: 1 } },
+  });
+}
+
 export interface PracticeHighlights {
   topic: string;
   subtopics: string[];

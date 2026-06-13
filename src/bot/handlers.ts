@@ -34,6 +34,7 @@ import {
   getTodaySession,
   createTodaySession,
   incrementStep,
+  decrementStep,
   completeSession,
   updateStreakAndWeekly,
   computeDayNumber,
@@ -1038,6 +1039,7 @@ async function handleDailyPracticeMessage(
       response.inputLanguage === "nonsense"
     ) {
       if (consumed) await refundDailyMessage(chat.id);
+      await decrementStep(updatedSession.id);
       await ctx.reply(formatForTelegram(UNSUPPORTED_WARNING), { parse_mode: "HTML" });
       return;
     }
