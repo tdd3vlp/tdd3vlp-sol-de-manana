@@ -347,14 +347,20 @@ describe("getProgressState", () => {
 
   it("returns completed status and highlights for a completed session", () => {
     const chat = makeChat({ streakCount: 3 });
-    const highlights = { phrases: ["Quiero una mesa"], corrections: [], encouragement: "Отлично!" };
+    const highlights = {
+      topic: "Directions",
+      subtopics: ["Asking for directions"],
+      whatWentWell: "Хорошо использовал предлоги",
+      focusArea: "Поработать над произношением",
+      encouragement: "Отлично!",
+    };
     const session = {
       id: "sess-1",
       chatId: "chat-1",
       date: "2026-06-13",
       dayNumber: 4,
       theme: "asking for directions",
-      stepCount: 5,
+      stepCount: 8,
       status: "completed",
       highlights: JSON.stringify(highlights),
       startedAt: new Date(),

@@ -349,7 +349,7 @@ export function formatForTelegram(text: string): string {
 async function replyWithSpoilerTranslation(
   ctx: Context,
   rawText: string,
-  response: SolResponse,
+  response: { inputLanguage: string; continuation: string },
   keyboard?: Keyboard,
 ): Promise<void> {
   const skipTranslation =
@@ -887,18 +887,30 @@ function assembleDailyPracticeMessage(
 }
 
 function buildDailyPracticeFinaleText(highlights: {
-  phrases: string[];
-  corrections: string[];
+  topic: string;
+  subtopics: string[];
+  whatWentWell: string;
+  focusArea: string;
   encouragement: string;
 }): string {
-  const parts: string[] = ["Практика завершена.\n"];
+  const parts: string[] = ["Практика завершена."];
 
-  if (highlights.phrases.length > 0) {
-    parts.push("Сегодня ты потренировал:\n" + highlights.phrases.map((p) => `• ${p}`).join("\n"));
+  if (highlights.topic) {
+    parts.push(`Тема: ${highlights.topic}`);
   }
 
-  if (highlights.corrections.length > 0) {
-    parts.push("Исправления:\n" + highlights.corrections.map((c) => `• ${c}`).join("\n"));
+  if (highlights.subtopics.length > 0) {
+    parts.push(
+      "Что практиковал:\n" + highlights.subtopics.map((s) => `• ${s}`).join("\n"),
+    );
+  }
+
+  if (highlights.whatWentWell) {
+    parts.push(highlights.whatWentWell);
+  }
+
+  if (highlights.focusArea) {
+    parts.push(`Над чем поработать: ${highlights.focusArea}`);
   }
 
   if (highlights.encouragement) {
@@ -1016,11 +1028,40 @@ async function handleDailyPracticeMessage(
   const model = getPlanModel(getEffectivePlan(activeChat), telegramUserId);
 
   try {
-    if (updatedSession.stepCount >= 5) {
-      // Finale
+    const isFinale = updatedSession.stepCount >= 8;
+
+    // Always send a regular response first (corrected/translated + continuation).
+    const response = await callDailyPractice(userText, llmHistory, updatedSession, model);
+
+    if (
+      response.inputLanguage === "unsupported" ||
+      response.inputLanguage === "nonsense"
+    ) {
+      if (consumed) await refundDailyMessage(chat.id);
+      await ctx.reply(formatForTelegram(UNSUPPORTED_WARNING), { parse_mode: "HTML" });
+      return;
+    }
+
+    const rawText = assembleDailyPracticeMessage(response, userText);
+
+    // Send regular response with spoiler translation (same as dialogue mode).
+    await replyWithSpoilerTranslation(ctx, rawText, response);
+
+    await saveDeliveredMessages(
+      chat.id,
+      [
+        { role: "user", text: userText },
+        { role: "assistant", text: rawText },
+      ],
+      ctx.api,
+    );
+
+    if (isFinale) {
+      // Send the finale as a separate message after the regular response.
       const finaleHistory = [
         ...llmHistory,
         { role: "user" as const, content: userText },
+        { role: "assistant" as const, content: rawText },
       ];
       const highlights = await callDailyPracticeFinale(finaleHistory, updatedSession, model);
       const finaleText = buildDailyPracticeFinaleText(highlights);
@@ -1036,33 +1077,7 @@ async function handleDailyPracticeMessage(
 
       await saveDeliveredMessages(
         chat.id,
-        [
-          { role: "user", text: userText },
-          { role: "assistant", text: finaleText },
-        ],
-        ctx.api,
-      );
-    } else {
-      const response = await callDailyPractice(userText, llmHistory, updatedSession, model);
-
-      if (
-        response.inputLanguage === "unsupported" ||
-        response.inputLanguage === "nonsense"
-      ) {
-        if (consumed) await refundDailyMessage(chat.id);
-        await ctx.reply(formatForTelegram(UNSUPPORTED_WARNING), { parse_mode: "HTML" });
-        return;
-      }
-
-      const rawText = assembleDailyPracticeMessage(response, userText);
-      await ctx.reply(formatForTelegram(rawText), { parse_mode: "HTML" });
-
-      await saveDeliveredMessages(
-        chat.id,
-        [
-          { role: "user", text: userText },
-          { role: "assistant", text: rawText },
-        ],
+        [{ role: "assistant", text: finaleText }],
         ctx.api,
       );
     }

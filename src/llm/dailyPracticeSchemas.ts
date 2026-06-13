@@ -5,16 +5,20 @@ export const DailyPracticeResponseSchema = z.object({
   correctionOrTranslation: z.string().nullable()
     .describe("The corrected Spanish sentence or Russian-to-Spanish translation only. One sentence, plain text. Null if no correction needed."),
   continuation: z.string()
-    .describe("Dialogue continuation and next question. Always ends with exactly one question."),
+    .describe("Dialogue continuation and next question. Always ends with exactly one open-ended question."),
 });
 
 export type DailyPracticeResponse = z.infer<typeof DailyPracticeResponseSchema>;
 
 export const DailyPracticeHighlightsSchema = z.object({
-  phrases: z.array(z.string()).min(1).max(4)
-    .describe("2-4 useful Spanish phrases or expressions the user practiced today"),
-  corrections: z.array(z.string()).max(3)
-    .describe("1-2 corrections made during the session, or empty array if no errors"),
+  topic: z.string()
+    .describe("The main topic practiced today in Russian, e.g. 'Кафе и рестораны'"),
+  subtopics: z.array(z.string()).min(1).max(4)
+    .describe("2-4 specific subtopics or phrases practiced, in Russian"),
+  whatWentWell: z.string()
+    .describe("What the user did well — 1 sentence in Russian"),
+  focusArea: z.string()
+    .describe("The single most important area to improve — 1 sentence in Russian"),
   encouragement: z.string()
     .describe("Short encouraging message in Russian, 1 sentence"),
 });

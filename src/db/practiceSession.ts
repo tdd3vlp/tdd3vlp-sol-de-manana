@@ -66,8 +66,10 @@ export async function incrementStep(sessionId: string): Promise<PracticeSession>
 }
 
 export interface PracticeHighlights {
-  phrases: string[];
-  corrections: string[];
+  topic: string;
+  subtopics: string[];
+  whatWentWell: string;
+  focusArea: string;
   encouragement: string;
 }
 

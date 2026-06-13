@@ -119,8 +119,10 @@ export async function callDailyPractice(
 }
 
 const FALLBACK_HIGHLIGHTS: DailyPracticeHighlights = {
-  phrases: [],
-  corrections: [],
+  topic: "Испанский язык",
+  subtopics: [],
+  whatWentWell: "Ты старался и продолжал разговор.",
+  focusArea: "Продолжай практиковать акцентные знаки.",
   encouragement: "Отличная работа сегодня!",
 };
 

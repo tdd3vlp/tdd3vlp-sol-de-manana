@@ -1090,16 +1090,28 @@
           highlightsEl.style.display = "";
           const h = state.today.highlights;
           let html = "";
-          if (h.phrases && h.phrases.length > 0) {
+          if (h.topic) {
             html += `<div class="highlights-section">
-              <div class="highlights-section-title">Фразы</div>
-              <ul class="highlights-list">${h.phrases.map(p => `<li>${escapeHtml(p)}</li>`).join("")}</ul>
+              <div class="highlights-section-title">Тема</div>
+              <div style="padding: 0 0 4px">${escapeHtml(h.topic)}</div>
             </div>`;
           }
-          if (h.corrections && h.corrections.length > 0) {
+          if (h.subtopics && h.subtopics.length > 0) {
             html += `<div class="highlights-section">
-              <div class="highlights-section-title">Исправления</div>
-              <ul class="highlights-list">${h.corrections.map(c => `<li>${escapeHtml(c)}</li>`).join("")}</ul>
+              <div class="highlights-section-title">Что практиковал</div>
+              <ul class="highlights-list">${h.subtopics.map(s => `<li>${escapeHtml(s)}</li>`).join("")}</ul>
+            </div>`;
+          }
+          if (h.whatWentWell) {
+            html += `<div class="highlights-section">
+              <div class="highlights-section-title">Хорошо получилось</div>
+              <div style="padding: 0 0 4px">${escapeHtml(h.whatWentWell)}</div>
+            </div>`;
+          }
+          if (h.focusArea) {
+            html += `<div class="highlights-section">
+              <div class="highlights-section-title">Над чем поработать</div>
+              <div style="padding: 0 0 4px">${escapeHtml(h.focusArea)}</div>
             </div>`;
           }
           if (h.encouragement) {
