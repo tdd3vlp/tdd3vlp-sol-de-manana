@@ -1004,6 +1004,15 @@
         return dates;
       }
 
+      function escapeHtml(value) {
+        return String(value)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#39;");
+      }
+
       function renderProgress(state) {
         const today = getTodayDateStringUTC3();
 
@@ -1085,17 +1094,17 @@
           if (h.phrases && h.phrases.length > 0) {
             html += `<div class="highlights-section">
               <div class="highlights-section-title">Фразы</div>
-              <ul class="highlights-list">${h.phrases.map(p => `<li>${p}</li>`).join("")}</ul>
+              <ul class="highlights-list">${h.phrases.map(p => `<li>${escapeHtml(p)}</li>`).join("")}</ul>
             </div>`;
           }
           if (h.corrections && h.corrections.length > 0) {
             html += `<div class="highlights-section">
               <div class="highlights-section-title">Исправления</div>
-              <ul class="highlights-list">${h.corrections.map(c => `<li>${c}</li>`).join("")}</ul>
+              <ul class="highlights-list">${h.corrections.map(c => `<li>${escapeHtml(c)}</li>`).join("")}</ul>
             </div>`;
           }
           if (h.encouragement) {
-            html += `<div class="highlights-encouragement">${h.encouragement}</div>`;
+            html += `<div class="highlights-encouragement">${escapeHtml(h.encouragement)}</div>`;
           }
           document.getElementById("highlights-body").innerHTML = html;
         } else {

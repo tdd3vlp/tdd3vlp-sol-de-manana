@@ -13,8 +13,6 @@ import { prisma } from "../db/prisma.js";
 import {
   getTodaySession,
   getProgressState,
-  computeDayNumber,
-  getThemeForDay,
 } from "../db/practiceSession.js";
 
 type PaidPlan = Exclude<Plan, "free">;
@@ -174,10 +172,16 @@ async function handleProgressRequest(
   req: http.IncomingMessage,
   res: http.ServerResponse,
 ): Promise<void> {
+  const jsonHeaders = {
+    "Content-Type": "application/json",
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Headers": "Authorization, Content-Type",
+    "Access-Control-Allow-Methods": "GET, OPTIONS",
+  };
   const authHeader = req.headers["authorization"] ?? "";
   const prefix = "TelegramInitData ";
   if (!authHeader.startsWith(prefix)) {
-    res.writeHead(401, { "Content-Type": "application/json" });
+    res.writeHead(401, jsonHeaders);
     res.end(JSON.stringify({ error: "Missing initData" }));
     return;
   }
@@ -185,7 +189,7 @@ async function handleProgressRequest(
   const rawInitData = authHeader.slice(prefix.length);
   const validated = validateTelegramInitData(rawInitData, config.telegramBotToken);
   if (!validated) {
-    res.writeHead(403, { "Content-Type": "application/json" });
+    res.writeHead(403, jsonHeaders);
     res.end(JSON.stringify({ error: "Invalid initData" }));
     return;
   }
@@ -205,7 +209,7 @@ async function handleProgressRequest(
         weeklyActiveDates: [] as string[],
         today: { status: "none", dayNumber: 1, dayLabel: "Знакомство" },
       };
-      res.writeHead(200, { "Content-Type": "application/json" });
+      res.writeHead(200, jsonHeaders);
       res.end(JSON.stringify(zeroed));
       return;
     }
@@ -213,13 +217,23 @@ async function handleProgressRequest(
     const todaySession = await getTodaySession(chat.id);
     const state = getProgressState(chat, todaySession);
 
-    res.writeHead(200, { "Content-Type": "application/json" });
+    res.writeHead(200, jsonHeaders);
     res.end(JSON.stringify(state));
   } catch (error) {
     console.error("Progress endpoint error:", error);
-    res.writeHead(500, { "Content-Type": "application/json" });
+    res.writeHead(500, jsonHeaders);
     res.end(JSON.stringify({ error: "Internal server error" }));
   }
+}
+
+function handleProgressOptions(res: http.ServerResponse): void {
+  res.writeHead(204, {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Headers": "Authorization, Content-Type",
+    "Access-Control-Allow-Methods": "GET, OPTIONS",
+    "Access-Control-Max-Age": "86400",
+  });
+  res.end();
 }
 
 function clientIp(req: http.IncomingMessage): string {
@@ -235,6 +249,11 @@ export function startWebhookServer(bot: Bot<Context>): http.Server {
     if (req.method === "GET" && url === "/health") {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ ok: true }));
+      return;
+    }
+
+    if (req.method === "OPTIONS" && url === "/api/progress") {
+      handleProgressOptions(res);
       return;
     }
 

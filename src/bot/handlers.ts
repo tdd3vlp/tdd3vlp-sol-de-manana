@@ -1018,7 +1018,11 @@ async function handleDailyPracticeMessage(
   try {
     if (updatedSession.stepCount >= 5) {
       // Finale
-      const highlights = await callDailyPracticeFinale(llmHistory, updatedSession, model);
+      const finaleHistory = [
+        ...llmHistory,
+        { role: "user" as const, content: userText },
+      ];
+      const highlights = await callDailyPracticeFinale(finaleHistory, updatedSession, model);
       const finaleText = buildDailyPracticeFinaleText(highlights);
 
       await ctx.reply(formatForTelegram(finaleText), {

@@ -50,6 +50,7 @@ function req(
   method: string,
   path: string,
   body?: string,
+  headers: http.OutgoingHttpHeaders = {},
 ): Promise<{ status: number; body: string }> {
   return new Promise((resolve, reject) => {
     const options: http.RequestOptions = {
@@ -57,7 +58,12 @@ function req(
       port,
       path,
       method,
-      headers: body ? { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(body) } : {},
+      headers: {
+        ...headers,
+        ...(body
+          ? { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(body) }
+          : {}),
+      },
     };
     const request = http.request(options, (res) => {
       let data = "";
@@ -92,6 +98,14 @@ describe("webhook server", () => {
     const res = await req(port, "GET", "/health");
     expect(res.status).toBe(200);
     expect(JSON.parse(res.body)).toEqual({ ok: true });
+  });
+
+  it("handles /api/progress CORS preflight", async () => {
+    const res = await req(port, "OPTIONS", "/api/progress", undefined, {
+      Origin: "https://example.com",
+      "Access-Control-Request-Headers": "authorization",
+    });
+    expect(res.status).toBe(204);
   });
 
   it("unknown path returns 404", async () => {
