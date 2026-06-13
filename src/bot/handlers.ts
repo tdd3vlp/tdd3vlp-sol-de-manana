@@ -1164,10 +1164,9 @@ async function trackDailyPracticeProgress(
 
     const completionText =
       `Практика дня выполнена.\n\nТы набрал минимальный ритм на сегодня. Подробная сводка появится в Mini App.\n\nСерия: ${newStreak} ${pluralDays(newStreak)} подряд.`;
-    await api.sendMessage(telegramChatId, completionText, {
-      reply_markup: buildDialogueKeyboard(chat.plan, telegramUserId),
-    });
 
+    // Notification and highlights are independent: a Telegram API failure must
+    // not prevent highlights from being saved, nor block the notification attempt.
     void (async () => {
       try {
         const historyWithCurrentTurn = [
@@ -1206,6 +1205,14 @@ async function trackDailyPracticeProgress(
         console.error("trackDailyPracticeProgress background highlights failed:", err);
       }
     })();
+
+    try {
+      await api.sendMessage(telegramChatId, completionText, {
+        reply_markup: buildDialogueKeyboard(chat.plan, telegramUserId),
+      });
+    } catch (err) {
+      console.error("trackDailyPracticeProgress: failed to send completion notification:", err);
+    }
   } catch (err) {
     console.error("trackDailyPracticeProgress failed:", err);
   }

@@ -331,6 +331,20 @@ describe("computeDayNumber", () => {
 // ─── Progress state ────────────────────────────────────────────────────────────
 
 describe("getProgressState", () => {
+  it("treats stale dailyPracticeResetAt as zeroed (new day before first message)", () => {
+    // User completed 10 sentences yesterday; resetAt is from yesterday.
+    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const chat = makeChat({
+      dailyPracticeSentenceCount: 10,
+      dailyPracticeCompletedAt: yesterday,
+      dailyPracticeResetAt: yesterday,
+    });
+    const state = getProgressState(chat, null);
+
+    expect(state.today.status).toBe("none");
+    expect(state.today.sentenceCount).toBe(0);
+  });
+
   it("returns zeroed state when no session today and no sentence count", () => {
     const chat = makeChat({ streakCount: 3, challengeCompletedCount: 1, weeklyActiveDates: '["2026-06-12"]' });
     const state = getProgressState(chat, null);
@@ -343,7 +357,8 @@ describe("getProgressState", () => {
   });
 
   it("returns active status when sentenceCount > 0 without a PracticeSession", () => {
-    const chat = makeChat({ streakCount: 2, dailyPracticeSentenceCount: 5 });
+    // dailyPracticeResetAt must be today so data is not treated as stale
+    const chat = makeChat({ streakCount: 2, dailyPracticeSentenceCount: 5, dailyPracticeResetAt: new Date() });
     const state = getProgressState(chat, null);
 
     expect(state.today.status).toBe("active");
@@ -351,8 +366,8 @@ describe("getProgressState", () => {
   });
 
   it("returns completed status when dailyPracticeCompletedAt is today, even without a PracticeSession", () => {
-    const todayUTC = new Date(); // now = today in UTC+3 for the test
-    const chat = makeChat({ dailyPracticeSentenceCount: 12, dailyPracticeCompletedAt: todayUTC });
+    const now = new Date();
+    const chat = makeChat({ dailyPracticeSentenceCount: 12, dailyPracticeCompletedAt: now, dailyPracticeResetAt: now });
     const state = getProgressState(chat, null);
 
     expect(state.today.status).toBe("completed");
@@ -382,7 +397,7 @@ describe("getProgressState", () => {
   });
 
   it("returns completed status and highlights for a completed session", () => {
-    const chat = makeChat({ streakCount: 3, dailyPracticeSentenceCount: 8 });
+    const chat = makeChat({ streakCount: 3, dailyPracticeSentenceCount: 8, dailyPracticeResetAt: new Date() });
     const highlights = {
       topic: "Directions",
       subtopics: ["Asking for directions"],

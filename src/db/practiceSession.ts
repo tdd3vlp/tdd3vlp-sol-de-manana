@@ -220,9 +220,20 @@ export function getProgressState(
   let highlights: PracticeHighlights | undefined;
 
   const today = getTodayDateStringUTC3();
+
+  // If dailyPracticeResetAt is from a prior day, the daily counters in the DB
+  // are stale (reset hasn't run yet — user hasn't sent a message today).
+  // Treat sentenceCount and completedAt as zeroed so Mini App shows a clean slate.
+  const resetDay = chat.dailyPracticeResetAt
+    ? getTodayDateStringUTC3(chat.dailyPracticeResetAt)
+    : null;
+  const isStale = resetDay !== today;
+  const effectiveSentenceCount = isStale ? 0 : chat.dailyPracticeSentenceCount;
+  const effectiveCompletedAt = isStale ? null : chat.dailyPracticeCompletedAt;
+
   const autoCompletedToday =
-    chat.dailyPracticeCompletedAt !== null &&
-    getTodayDateStringUTC3(chat.dailyPracticeCompletedAt) === today;
+    effectiveCompletedAt !== null &&
+    getTodayDateStringUTC3(effectiveCompletedAt) === today;
 
   if (todaySession?.status === "completed") {
     todayStatus = "completed";
@@ -243,7 +254,7 @@ export function getProgressState(
         // ignore malformed JSON
       }
     }
-  } else if (chat.dailyPracticeSentenceCount > 0) {
+  } else if (effectiveSentenceCount > 0) {
     todayStatus = "active";
   } else if (todaySession?.status === "active") {
     todayStatus = "active";
@@ -260,7 +271,7 @@ export function getProgressState(
       dayLabel:
         CHALLENGE_DAY_LABELS[todaySession?.dayNumber ?? dayNumber] ??
         `День ${todaySession?.dayNumber ?? dayNumber}`,
-      sentenceCount: chat.dailyPracticeSentenceCount,
+      sentenceCount: effectiveSentenceCount,
       highlights,
     },
   };
