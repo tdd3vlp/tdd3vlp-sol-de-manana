@@ -20,6 +20,10 @@ export const config = {
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean),
+  betaTelegramIds: (process.env.BETA_TELEGRAM_IDS ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean),
   webAppUrl: process.env.WEBAPP_URL ?? "",
   // Legacy Telegram Payments provider token (kept for reference, no longer used for RUB)
   yookassaProviderToken: process.env.YOOKASSA_PROVIDER_TOKEN ?? "",

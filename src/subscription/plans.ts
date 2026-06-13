@@ -43,6 +43,13 @@ export function isAdminUser(telegramUserId: string): boolean {
   return config.adminTelegramIds.includes(telegramUserId);
 }
 
+export function isBetaUser(telegramUserId: string): boolean {
+  return (
+    config.betaTelegramIds.includes(telegramUserId) ||
+    isAdminUser(telegramUserId)
+  );
+}
+
 export function getPlanLimit(plan: string): number {
   return PLAN_LIMITS[plan as Plan] ?? PLAN_LIMITS.free;
 }
