@@ -75,12 +75,19 @@ const BTN_MODE_DIALOGUE = "Режим диалога";
 const BTN_CUSTOM_TOPIC = "Своя тема";
 const BTN_DAILY_PRACTICE = "Практика дня";
 
-export function buildDialogueKeyboard(plan: string, userId?: string): Keyboard {
+export function buildDialogueKeyboard(
+  plan: string,
+  userId?: string,
+  options: { showDailyPractice?: boolean } = {},
+): Keyboard {
+  const showDailyPractice =
+    options.showDailyPractice ?? !!(userId && isBetaUser(userId));
+
   const kb = new Keyboard().text(BTN_TOPIC_MENU);
   if (plan === "premium" || (userId && isAdminUser(userId))) {
     kb.text(BTN_MODE_TRANSLATION);
   }
-  if (userId && isBetaUser(userId)) {
+  if (showDailyPractice) {
     kb.row().text(BTN_DAILY_PRACTICE);
   }
   return kb.resized().persistent();
@@ -478,7 +485,7 @@ export async function handleStart(ctx: Context): Promise<void> {
   const telegramUserId = ctx.from?.id?.toString();
   const firstName = ctx.from?.first_name ?? "друг";
 
-  // Deep link from Mini App: start=daily_practice
+  // Daily practice handoff from Mini App via Telegram start payload.
   if (payload === "daily_practice") {
     if (telegramUserId && isBetaUser(telegramUserId)) {
       const dpChat = await getOrCreateChat(telegramChatId, pickRandomTheme());
@@ -523,6 +530,13 @@ async function enterDialogueMode(ctx: Context): Promise<void> {
   let chat = await getOrCreateChat(telegramChatId, pickRandomTheme());
   await updateChatMode(chat.id, "dialogue");
 
+  // For beta users: hide "Практика дня" if today's session is already completed.
+  let showDailyPractice = !!(telegramUserId && isBetaUser(telegramUserId));
+  if (showDailyPractice) {
+    const todaySession = await getTodaySession(chat.id);
+    showDailyPractice = todaySession?.status !== "completed";
+  }
+
   const {
     allowed,
     consumed,
@@ -544,7 +558,7 @@ async function enterDialogueMode(ctx: Context): Promise<void> {
       ctx,
       rawText,
       response,
-      buildDialogueKeyboard(chat.plan, telegramUserId),
+      buildDialogueKeyboard(chat.plan, telegramUserId, { showDailyPractice }),
     );
     await saveDeliveredMessages(
       chat.id,
@@ -965,10 +979,14 @@ async function handleDailyPracticeButton(
   const model = getPlanModel(getEffectivePlan(chat), telegramUserId);
   try {
     const openingText = await callDailyPracticeStart(newSession, model);
-    await ctx.reply(formatForTelegram(openingText), {
-      parse_mode: "HTML",
-      reply_markup: buildDialogueKeyboard(chat.plan, telegramUserId),
-    });
+    // Opening message goes through replyWithSpoilerTranslation so the Russian
+    // spoiler is appended — consistent with all subsequent practice turns.
+    await replyWithSpoilerTranslation(
+      ctx,
+      openingText,
+      { inputLanguage: "spanish", continuation: openingText },
+      buildDialogueKeyboard(chat.plan, telegramUserId),
+    );
     await saveDeliveredMessages(
       chat.id,
       [{ role: "assistant", text: openingText }],

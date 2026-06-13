@@ -484,24 +484,6 @@
         color: var(--text-sub);
         cursor: default;
       }
-      .talk-btn {
-        width: 100%;
-        padding: 13px;
-        border: 1.5px solid var(--border-basic);
-        border-radius: 10px;
-        font-size: 15px;
-        font-weight: 600;
-        cursor: pointer;
-        transition: opacity 0.15s;
-        -webkit-tap-highlight-color: transparent;
-        background: var(--card-bg);
-        color: var(--accent-dark);
-        margin-top: 8px;
-      }
-      .talk-btn:active {
-        opacity: 0.72;
-      }
-
       .highlights {
         margin-top: 14px;
         border-top: 1px solid var(--border);
@@ -661,7 +643,6 @@
           </div>
           <div class="today-theme" id="today-theme"></div>
           <button class="practice-btn" id="practice-btn" disabled>Загрузка...</button>
-          <button class="talk-btn" id="talk-btn" style="display:none">Поговорить с Sol</button>
           <div class="highlights" id="highlights" style="display:none">
             <div class="highlights-toggle" id="highlights-toggle">
               <span class="highlights-toggle-label">Итог практики</span>
@@ -1060,10 +1041,9 @@
         const badge = document.getElementById("today-badge");
         const todayTheme = document.getElementById("today-theme");
         const practiceBtn = document.getElementById("practice-btn");
-        const talkBtn = document.getElementById("talk-btn");
         const highlightsEl = document.getElementById("highlights");
 
-        todayTheme.textContent = "День " + state.today.dayNumber + " — " + state.today.dayLabel;
+        todayTheme.textContent = "День " + state.today.dayNumber + " из 7";
 
         const badgeMap = { none: "Не начато", active: "В процессе", completed: "Завершено" };
         badge.textContent = badgeMap[status] || status;
@@ -1072,17 +1052,11 @@
         practiceBtn.disabled = status === "completed";
 
         if (status === "none") {
-          practiceBtn.textContent = "Начать практику";
-          practiceBtn.style.display = "";
-          talkBtn.style.display = "none";
+          practiceBtn.textContent = "Начать в чате";
         } else if (status === "active") {
-          practiceBtn.textContent = "Продолжить практику";
-          practiceBtn.style.display = "";
-          talkBtn.style.display = "none";
+          practiceBtn.textContent = "Продолжить в чате";
         } else {
           practiceBtn.textContent = "Завершено сегодня";
-          practiceBtn.style.display = "";
-          talkBtn.style.display = "";
         }
 
         // Highlights (only when completed)
@@ -1132,12 +1106,6 @@
       document.getElementById("practice-btn").addEventListener("click", () => {
         const url = "https://t.me/" + BOT_USERNAME + "?start=daily_practice";
         openTgLink(url);
-        if (tg) setTimeout(() => tg.close(), 300);
-      });
-
-      // Talk button
-      document.getElementById("talk-btn").addEventListener("click", () => {
-        openTgLink("https://t.me/" + BOT_USERNAME);
         if (tg) setTimeout(() => tg.close(), 300);
       });
 

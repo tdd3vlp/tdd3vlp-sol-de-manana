@@ -108,11 +108,11 @@ describe("buildDialogueKeyboard", () => {
     return kb.keyboard.flat().map((b) => (typeof b === "string" ? b : (b as { text: string }).text));
   }
 
-  it("includes the Практика дня button for beta users", () => {
+  it("includes the Практика дня button for beta users (default)", () => {
     expect(buttonTexts(buildDialogueKeyboard("free", "beta-1"))).toContain("Практика дня");
   });
 
-  it("includes the Практика дня button for admin users", () => {
+  it("includes the Практика дня button for admin users (default)", () => {
     expect(buttonTexts(buildDialogueKeyboard("free", "admin-1"))).toContain("Практика дня");
   });
 
@@ -122,6 +122,18 @@ describe("buildDialogueKeyboard", () => {
 
   it("does not include Практика дня when userId is undefined", () => {
     expect(buttonTexts(buildDialogueKeyboard("premium", undefined))).not.toContain("Практика дня");
+  });
+
+  it("hides Практика дня for beta user when showDailyPractice=false", () => {
+    expect(
+      buttonTexts(buildDialogueKeyboard("free", "beta-1", { showDailyPractice: false })),
+    ).not.toContain("Практика дня");
+  });
+
+  it("shows Практика дня for regular user when showDailyPractice=true", () => {
+    expect(
+      buttonTexts(buildDialogueKeyboard("free", "regular-999", { showDailyPractice: true })),
+    ).toContain("Практика дня");
   });
 });
 
