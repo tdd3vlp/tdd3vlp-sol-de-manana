@@ -25,6 +25,20 @@ import {
   translateToRussian,
   SolServiceError,
 } from "../llm/solService.js";
+import {
+  callDailyPracticeStart,
+  callDailyPractice,
+  callDailyPracticeFinale,
+} from "../llm/dailyPracticeService.js";
+import {
+  getTodaySession,
+  createTodaySession,
+  incrementStep,
+  completeSession,
+  updateStreakAndWeekly,
+  computeDayNumber,
+  getThemeForDay,
+} from "../db/practiceSession.js";
 import { buildLLMContext } from "../conversation/context.js";
 import {
   isKnownTheme,
@@ -58,11 +72,15 @@ const BTN_TOPIC_MENU = "Выбор темы";
 const BTN_MODE_TRANSLATION = "Режим перевода";
 const BTN_MODE_DIALOGUE = "Режим диалога";
 const BTN_CUSTOM_TOPIC = "Своя тема";
+const BTN_DAILY_PRACTICE = "Практика дня";
 
 export function buildDialogueKeyboard(plan: string, userId?: string): Keyboard {
   const kb = new Keyboard().text(BTN_TOPIC_MENU);
   if (plan === "premium" || (userId && isAdminUser(userId))) {
     kb.text(BTN_MODE_TRANSLATION);
+  }
+  if (userId && isBetaUser(userId)) {
+    kb.row().text(BTN_DAILY_PRACTICE);
   }
   return kb.resized().persistent();
 }
@@ -456,11 +474,20 @@ export async function handleStart(ctx: Context): Promise<void> {
     return;
   }
 
-  const theme = pickRandomTheme();
-  await resetChat(telegramChatId, theme);
-
   const telegramUserId = ctx.from?.id?.toString();
   const firstName = ctx.from?.first_name ?? "друг";
+
+  // Deep link from Mini App: start=daily_practice
+  if (payload === "daily_practice") {
+    if (telegramUserId && isBetaUser(telegramUserId)) {
+      const dpChat = await getOrCreateChat(telegramChatId, pickRandomTheme());
+      await handleDailyPracticeButton(ctx, dpChat, telegramUserId);
+      return;
+    }
+  }
+
+  const theme = pickRandomTheme();
+  await resetChat(telegramChatId, theme);
 
   const webAppUrl =
     telegramUserId && isBetaUser(telegramUserId) && config.webAppBetaUrl
@@ -833,6 +860,225 @@ export async function handleTopicCallback(ctx: Context): Promise<void> {
   }
 }
 
+// ─── Daily practice ───────────────────────────────────────────────────────────
+
+function assembleDailyPracticeMessage(
+  response: { correctionOrTranslation: string | null; continuation: string },
+  userInput?: string,
+): string {
+  const parts: string[] = [];
+  if (meaningful(response.correctionOrTranslation)) {
+    let correction = sanitizeLlmArtifacts(response.correctionOrTranslation);
+    const plain = correction.replace(/\*\*(.+?)\*\*/g, "$1");
+    if (userInput) {
+      const prefixMatch = plain.match(/(?:Corrección:|En español:)\s*([\s\S]*)/i);
+      const withoutPrefix = prefixMatch ? prefixMatch[1].trim() : plain.trim();
+      const bolded = diffAndBold(userInput, withoutPrefix);
+      const prefix = plain.startsWith("En español:") ? "En español:" : "Corrección:";
+      correction = bolded && meaningful(bolded) ? `${prefix} ${bolded}` : "";
+    } else {
+      correction = plain;
+    }
+    if (meaningful(correction)) parts.push(correction);
+  }
+  const cont = sanitizeLlmArtifacts(response.continuation).replace(/\*\*(.+?)\*\*/g, "$1");
+  parts.push(cont || UNSUPPORTED_WARNING);
+  return parts.join("\n\n").trim();
+}
+
+function buildDailyPracticeFinaleText(highlights: {
+  phrases: string[];
+  corrections: string[];
+  encouragement: string;
+}): string {
+  const parts: string[] = ["Практика завершена.\n"];
+
+  if (highlights.phrases.length > 0) {
+    parts.push("Сегодня ты потренировал:\n" + highlights.phrases.map((p) => `• ${p}`).join("\n"));
+  }
+
+  if (highlights.corrections.length > 0) {
+    parts.push("Исправления:\n" + highlights.corrections.map((c) => `• ${c}`).join("\n"));
+  }
+
+  if (highlights.encouragement) {
+    parts.push(highlights.encouragement);
+  }
+
+  return parts.join("\n\n");
+}
+
+type ChatRecord = Awaited<ReturnType<typeof getOrCreateChat>>;
+
+async function handleDailyPracticeButton(
+  ctx: Context,
+  chat: ChatRecord,
+  telegramUserId: string,
+): Promise<void> {
+  const telegramChatId = ctx.chat?.id?.toString();
+  if (!telegramChatId) return;
+
+  if (!isBetaUser(telegramUserId)) return;
+
+  const session = await getTodaySession(chat.id);
+
+  if (session?.status === "completed") {
+    await ctx.reply(
+      "Практика на сегодня завершена. Возвращайся завтра!",
+      {
+        reply_markup: new InlineKeyboard().text("Продолжить в диалоге", "mode_dialogue"),
+      },
+    );
+    return;
+  }
+
+  if (session?.status === "active") {
+    if (chat.mode !== "daily_practice") {
+      await updateChatMode(chat.id, "daily_practice");
+    }
+    await ctx.reply(
+      "Продолжаем практику дня. Ответь на последний вопрос Sol или напиши коротко, где остановились.",
+      { reply_markup: buildDialogueKeyboard(chat.plan, telegramUserId) },
+    );
+    return;
+  }
+
+  // Start a new session
+  const dayNumber = computeDayNumber(chat);
+  const theme = getThemeForDay(dayNumber);
+  const newSession = await createTodaySession(chat.id, dayNumber, theme);
+  await updateChatMode(chat.id, "daily_practice");
+
+  const model = getPlanModel(getEffectivePlan(chat), telegramUserId);
+  try {
+    const openingText = await callDailyPracticeStart(newSession, model);
+    await ctx.reply(formatForTelegram(openingText), {
+      parse_mode: "HTML",
+      reply_markup: buildDialogueKeyboard(chat.plan, telegramUserId),
+    });
+    await saveDeliveredMessages(
+      chat.id,
+      [{ role: "assistant", text: openingText }],
+      ctx.api,
+    );
+  } catch (error) {
+    console.error("handleDailyPracticeButton start error:", error);
+    void reportUserVisibleError(ctx.api, {
+      handler: "handleDailyPracticeButton",
+      error,
+      telegramChatId,
+      telegramUserId,
+    });
+    await ctx.reply("Lo siento, ocurrió un error. Por favor, inténtalo de nuevo.");
+  }
+}
+
+async function handleDailyPracticeMessage(
+  ctx: Context,
+  chat: ChatRecord,
+  telegramUserId: string | undefined,
+): Promise<void> {
+  const telegramChatId = ctx.chat?.id?.toString();
+  const userText = ctx.message?.text;
+  if (!telegramChatId || !userText) return;
+
+  const session = await getTodaySession(chat.id);
+  if (!session || session.status === "completed") {
+    // Session gone or already done: drop back to dialogue
+    await updateChatMode(chat.id, "dialogue");
+    await ctx.reply(
+      "Практика уже завершена. Продолжим в обычном режиме.",
+      { reply_markup: buildDialogueKeyboard(chat.plan, telegramUserId) },
+    );
+    return;
+  }
+
+  if (userText.length > 350) {
+    await ctx.reply("Сообщение слишком длинное. Пожалуйста, напиши не более 3–4 предложений.");
+    return;
+  }
+
+  if (isNonsense(userText) || isLikelyUnsupported(userText) || isPromptInjectionAttempt(userText)) {
+    await ctx.reply(formatForTelegram(UNSUPPORTED_WARNING), { parse_mode: "HTML" });
+    return;
+  }
+
+  const { allowed, consumed, chat: freshChat } = await consumeDailyMessage(chat, telegramUserId);
+  const activeChat = freshChat;
+  if (!allowed) {
+    await sendPaywall(ctx, activeChat.plan);
+    return;
+  }
+
+  const updatedSession = await incrementStep(session.id);
+  const recentMessages = await getRecentMessages(chat.id, 14);
+  const llmHistory = buildLLMContext(recentMessages);
+  const model = getPlanModel(getEffectivePlan(activeChat), telegramUserId);
+
+  try {
+    if (updatedSession.stepCount >= 5) {
+      // Finale
+      const highlights = await callDailyPracticeFinale(llmHistory, updatedSession, model);
+      const finaleText = buildDailyPracticeFinaleText(highlights);
+
+      await ctx.reply(formatForTelegram(finaleText), {
+        parse_mode: "HTML",
+        reply_markup: new InlineKeyboard().text("Продолжить в диалоге", "mode_dialogue"),
+      });
+
+      await completeSession(updatedSession.id, highlights);
+      await updateStreakAndWeekly(activeChat, chat.id);
+      await updateChatMode(chat.id, "dialogue");
+
+      await saveDeliveredMessages(
+        chat.id,
+        [
+          { role: "user", text: userText },
+          { role: "assistant", text: finaleText },
+        ],
+        ctx.api,
+      );
+    } else {
+      const response = await callDailyPractice(userText, llmHistory, updatedSession, model);
+
+      if (
+        response.inputLanguage === "unsupported" ||
+        response.inputLanguage === "nonsense"
+      ) {
+        if (consumed) await refundDailyMessage(chat.id);
+        await ctx.reply(formatForTelegram(UNSUPPORTED_WARNING), { parse_mode: "HTML" });
+        return;
+      }
+
+      const rawText = assembleDailyPracticeMessage(response, userText);
+      await ctx.reply(formatForTelegram(rawText), { parse_mode: "HTML" });
+
+      await saveDeliveredMessages(
+        chat.id,
+        [
+          { role: "user", text: userText },
+          { role: "assistant", text: rawText },
+        ],
+        ctx.api,
+      );
+    }
+  } catch (error) {
+    if (consumed) await refundDailyMessage(chat.id);
+    void reportUserVisibleError(ctx.api, {
+      handler: "handleDailyPracticeMessage",
+      error,
+      telegramChatId,
+      telegramUserId,
+      mode: "daily_practice",
+      inputPreview: userText,
+    });
+    console.error("handleDailyPracticeMessage error:", error);
+    await ctx.reply(
+      "Lo siento, tuve un problema al procesar tu mensaje. Por favor, inténtalo de nuevo.",
+    );
+  }
+}
+
 // ─── Email collection for ЮKassa receipts ────────────────────────────────────
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -885,11 +1131,23 @@ export async function handleMessage(ctx: Context): Promise<void> {
     await showTopicMenu(ctx, isPremium);
     return;
   }
+  if (userText === BTN_DAILY_PRACTICE) {
+    if (telegramUserId && isBetaUser(telegramUserId)) {
+      const dpChat = await getOrCreateChat(telegramChatId, pickRandomTheme());
+      await handleDailyPracticeButton(ctx, dpChat, telegramUserId);
+    }
+    return;
+  }
 
   let chat = await getOrCreateChat(telegramChatId, pickRandomTheme());
 
   // Mode-specific input is routed before dialogue checks: translation allows
   // longer text (500) and custom topics may contain English words.
+  if (chat.mode === "daily_practice") {
+    await handleDailyPracticeMessage(ctx, chat, telegramUserId);
+    return;
+  }
+
   if (chat.mode === "translation") {
     await handleTranslationInput(ctx, userText);
     return;

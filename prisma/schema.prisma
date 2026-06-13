@@ -8,21 +8,44 @@ datasource db {
 }
 
 model Chat {
-  id                String    @id @default(cuid())
-  telegramChatId    String    @unique
-  currentTheme      String
-  themeReplyCount   Int       @default(0)
-  plan              String    @default("free")
-  planExpiresAt     DateTime?
-  mode              String    @default("dialogue")
-  lockTheme         Boolean   @default(false)
-  dailyMessageCount  Int       @default(0)
-  dailyResetAt       DateTime  @default(now())
-  customerEmail      String?
-  pendingPaymentPlan String?
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
-  messages           Message[]
+  id                      String            @id @default(cuid())
+  telegramChatId          String            @unique
+  currentTheme            String
+  themeReplyCount         Int               @default(0)
+  plan                    String            @default("free")
+  planExpiresAt           DateTime?
+  mode                    String            @default("dialogue")
+  lockTheme               Boolean           @default(false)
+  dailyMessageCount       Int               @default(0)
+  dailyResetAt            DateTime          @default(now())
+  customerEmail           String?
+  pendingPaymentPlan      String?
+  streakCount             Int               @default(0)
+  lastStreakDate          String?
+  weeklyActiveDates       String            @default("[]")
+  weeklyResetAt           DateTime?
+  challengeCompletedCount Int               @default(0)
+  createdAt               DateTime          @default(now())
+  updatedAt               DateTime          @updatedAt
+  messages                Message[]
+  practiceSessions        PracticeSession[]
+}
+
+model PracticeSession {
+  id          String    @id @default(cuid())
+  chatId      String
+  date        String
+  dayNumber   Int
+  theme       String
+  stepCount   Int       @default(0)
+  status      String    @default("active")
+  highlights  String?
+  startedAt   DateTime  @default(now())
+  completedAt DateTime?
+  chat        Chat      @relation(fields: [chatId], references: [id])
+
+  @@unique([chatId, date])
+  @@index([chatId])
 }
 
 model Payment {

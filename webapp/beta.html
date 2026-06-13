@@ -274,6 +274,308 @@
         font-weight: 600;
       }
 
+      /* ── Progress tab ── */
+      .progress-section {
+        padding: 16px 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .streak-card {
+        background: var(--card-bg);
+        border-radius: 16px;
+        border: 1.5px solid var(--border);
+        padding: 22px 16px 18px;
+        text-align: center;
+      }
+      .streak-number {
+        font-size: 52px;
+        font-weight: 800;
+        color: var(--accent);
+        line-height: 1;
+        letter-spacing: -2px;
+      }
+      .streak-label {
+        font-size: 13px;
+        color: var(--text-sub);
+        margin-top: 4px;
+        font-weight: 500;
+        letter-spacing: 0.2px;
+      }
+
+      .challenge-card {
+        background: var(--card-bg);
+        border-radius: 16px;
+        border: 1.5px solid var(--border);
+        padding: 16px;
+      }
+      .challenge-title {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text-sub);
+        margin-bottom: 14px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+      .challenge-days {
+        display: flex;
+        gap: 6px;
+        justify-content: space-between;
+      }
+      .challenge-day {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 5px;
+      }
+      .challenge-dot {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        border: 2px solid var(--border);
+        background: var(--bg);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--text-sub);
+        transition: all 0.2s;
+      }
+      .challenge-dot.done {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #fff;
+      }
+      .challenge-dot.today {
+        border-color: var(--accent);
+        color: var(--accent);
+        box-shadow: 0 0 0 3px rgba(212, 117, 26, 0.15);
+      }
+      .challenge-dot.today.done {
+        background: var(--accent);
+        color: #fff;
+        box-shadow: 0 0 0 3px rgba(212, 117, 26, 0.15);
+      }
+      .challenge-day-label {
+        font-size: 9px;
+        color: var(--text-sub);
+        text-align: center;
+        line-height: 1.2;
+        max-width: 36px;
+        word-break: break-word;
+      }
+
+      .weekly-card {
+        background: var(--card-bg);
+        border-radius: 16px;
+        border: 1.5px solid var(--border);
+        padding: 16px;
+      }
+      .weekly-title {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text-sub);
+        margin-bottom: 14px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+      .weekly-days {
+        display: flex;
+        gap: 6px;
+        justify-content: space-between;
+      }
+      .weekly-day {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 5px;
+      }
+      .weekly-dot {
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        border: 2px solid var(--border);
+        background: var(--bg);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .weekly-dot.active {
+        background: var(--accent);
+        border-color: var(--accent);
+      }
+      .weekly-dot.active svg {
+        display: block;
+      }
+      .weekly-dot svg {
+        display: none;
+      }
+      .weekly-dot.today-marker {
+        border-color: var(--accent);
+      }
+      .weekly-day-name {
+        font-size: 10px;
+        color: var(--text-sub);
+        font-weight: 500;
+      }
+
+      .today-card {
+        background: var(--card-bg);
+        border-radius: 16px;
+        border: 1.5px solid var(--border);
+        padding: 16px;
+      }
+      .today-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 14px;
+      }
+      .today-title {
+        font-size: 15px;
+        font-weight: 700;
+        color: var(--text);
+      }
+      .today-badge {
+        font-size: 11px;
+        font-weight: 600;
+        padding: 3px 10px;
+        border-radius: 20px;
+      }
+      .today-badge.none {
+        background: #efe4d0;
+        color: var(--accent-dark);
+      }
+      .today-badge.active {
+        background: #fef3c7;
+        color: #92400e;
+      }
+      .today-badge.completed {
+        background: #d1fae5;
+        color: #065f46;
+      }
+      .today-theme {
+        font-size: 13px;
+        color: var(--text-sub);
+        margin-bottom: 14px;
+      }
+      .practice-btn {
+        width: 100%;
+        padding: 13px;
+        border: none;
+        border-radius: 10px;
+        font-size: 15px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: opacity 0.15s;
+        -webkit-tap-highlight-color: transparent;
+        background: var(--accent);
+        color: #fff;
+      }
+      .practice-btn:active {
+        opacity: 0.72;
+      }
+      .practice-btn:disabled {
+        background: #efe4d0;
+        color: var(--text-sub);
+        cursor: default;
+      }
+      .talk-btn {
+        width: 100%;
+        padding: 13px;
+        border: 1.5px solid var(--border-basic);
+        border-radius: 10px;
+        font-size: 15px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: opacity 0.15s;
+        -webkit-tap-highlight-color: transparent;
+        background: var(--card-bg);
+        color: var(--accent-dark);
+        margin-top: 8px;
+      }
+      .talk-btn:active {
+        opacity: 0.72;
+      }
+
+      .highlights {
+        margin-top: 14px;
+        border-top: 1px solid var(--border);
+        padding-top: 14px;
+      }
+      .highlights-toggle {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+        user-select: none;
+        padding-bottom: 2px;
+      }
+      .highlights-toggle-label {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text);
+      }
+      .highlights-chevron {
+        color: var(--text-sub);
+        transition: transform 0.2s;
+        flex-shrink: 0;
+      }
+      .highlights.open .highlights-chevron {
+        transform: rotate(180deg);
+      }
+      .highlights-body {
+        max-height: 0;
+        overflow: hidden;
+        transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+      .highlights.open .highlights-body {
+        max-height: 400px;
+      }
+      .highlights-section {
+        margin-top: 12px;
+      }
+      .highlights-section-title {
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--text-sub);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 6px;
+      }
+      .highlights-list {
+        list-style: none;
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+      }
+      .highlights-list li {
+        font-size: 13px;
+        color: var(--text);
+        line-height: 1.45;
+        padding-left: 12px;
+        position: relative;
+      }
+      .highlights-list li::before {
+        content: "•";
+        position: absolute;
+        left: 0;
+        color: var(--accent);
+        font-weight: 700;
+      }
+      .highlights-encouragement {
+        margin-top: 12px;
+        font-size: 13px;
+        color: var(--text-sub);
+        font-style: italic;
+        line-height: 1.5;
+      }
+
       /* ── Contacts tab ── */
       .contacts-section {
         padding: 16px 12px;
@@ -323,9 +625,57 @@
     </div>
 
     <div class="tab-nav">
+      <button class="tab-btn" data-tab="progress">Прогресс</button>
       <button class="tab-btn" data-tab="plans">Тарифы</button>
       <button class="tab-btn" data-tab="tips">Советы</button>
       <button class="tab-btn" data-tab="contacts">Контакты</button>
+    </div>
+
+    <!-- ── Progress tab ── -->
+    <div class="tab-pane" id="tab-progress">
+      <div class="progress-section" id="progress-content">
+
+        <div class="streak-card">
+          <div class="streak-number" id="streak-number">—</div>
+          <div class="streak-label">Серия</div>
+        </div>
+
+        <div class="challenge-card">
+          <div class="challenge-title">7 дней испанского</div>
+          <div class="challenge-days" id="challenge-days">
+            <!-- filled by JS -->
+          </div>
+        </div>
+
+        <div class="weekly-card">
+          <div class="weekly-title">Эта неделя</div>
+          <div class="weekly-days" id="weekly-days">
+            <!-- filled by JS -->
+          </div>
+        </div>
+
+        <div class="today-card" id="today-card">
+          <div class="today-header">
+            <span class="today-title" id="today-title">Сегодня</span>
+            <span class="today-badge none" id="today-badge">Загрузка</span>
+          </div>
+          <div class="today-theme" id="today-theme"></div>
+          <button class="practice-btn" id="practice-btn" disabled>Загрузка...</button>
+          <button class="talk-btn" id="talk-btn" style="display:none">Поговорить с Sol</button>
+          <div class="highlights" id="highlights" style="display:none">
+            <div class="highlights-toggle" id="highlights-toggle">
+              <span class="highlights-toggle-label">Итог практики</span>
+              <svg class="highlights-chevron" width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+            <div class="highlights-body" id="highlights-body">
+              <!-- filled by JS -->
+            </div>
+          </div>
+        </div>
+
+      </div>
     </div>
 
     <!-- ── Plans tab ── -->
@@ -536,10 +886,10 @@
         });
       }
 
-      const validTabs = ["plans", "tips", "contacts"];
+      const validTabs = ["progress", "plans", "tips", "contacts"];
       const initialTab = validTabs.includes(window.location.hash.slice(1))
         ? window.location.hash.slice(1)
-        : "plans";
+        : "progress";
       showTab(initialTab);
 
       document.querySelectorAll(".tab-btn").forEach((btn) => {
@@ -616,6 +966,203 @@
       document.getElementById("manager-btn").addEventListener("click", () => {
         openTgLink("https://t.me/tdd3vlp");
       });
+
+      // ── Progress tab ─────────────────────────────────────────────────────────
+
+      const BOT_USERNAME = "soldemanana_bot";
+      // Update this to the server's public URL in production (e.g. https://yourserver.com)
+      const API_BASE_URL = "";
+
+      const CHALLENGE_DAY_LABELS = [
+        "", // index 0 unused
+        "Знакомство",
+        "Кафе",
+        "Супермаркет",
+        "Дорогу",
+        "Квартира",
+        "Врач",
+        "Свободный"
+      ];
+      const WEEK_DAYS_SHORT = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
+
+      function getTodayDateStringUTC3() {
+        const now = new Date();
+        const utc3 = new Date(now.getTime() + 3 * 60 * 60 * 1000);
+        return utc3.toISOString().slice(0, 10);
+      }
+
+      function getWeekDatesUTC3() {
+        const today = getTodayDateStringUTC3();
+        const d = new Date(today + "T00:00:00Z");
+        const dayOfWeek = (d.getUTCDay() + 6) % 7; // Mon=0 … Sun=6
+        const dates = [];
+        for (let i = 0; i < 7; i++) {
+          const dt = new Date(d);
+          dt.setUTCDate(d.getUTCDate() - dayOfWeek + i);
+          dates.push(dt.toISOString().slice(0, 10));
+        }
+        return dates;
+      }
+
+      function renderProgress(state) {
+        const today = getTodayDateStringUTC3();
+
+        // Streak
+        document.getElementById("streak-number").textContent = state.streak;
+
+        // Challenge days
+        const challengeContainer = document.getElementById("challenge-days");
+        challengeContainer.innerHTML = "";
+        const dayNumber = state.today.dayNumber;
+        const isTodayDone = state.today.status === "completed";
+        for (let d = 1; d <= 7; d++) {
+          const isCompleted = d < dayNumber || (d === dayNumber && isTodayDone);
+          const isToday = d === dayNumber;
+          const dot = document.createElement("div");
+          dot.className = "challenge-day";
+          const dotClasses = ["challenge-dot"];
+          if (isCompleted) dotClasses.push("done");
+          if (isToday) dotClasses.push("today");
+          dot.innerHTML = `
+            <div class="${dotClasses.join(" ")}">${isCompleted ? "✓" : d}</div>
+            <span class="challenge-day-label">${CHALLENGE_DAY_LABELS[d] || d}</span>`;
+          challengeContainer.appendChild(dot);
+        }
+
+        // Weekly days
+        const weekContainer = document.getElementById("weekly-days");
+        weekContainer.innerHTML = "";
+        const weekDates = getWeekDatesUTC3();
+        weekDates.forEach((date, i) => {
+          const isActive = state.weeklyActiveDates.includes(date);
+          const isToday = date === today;
+          const dotClasses = ["weekly-dot"];
+          if (isActive) dotClasses.push("active");
+          if (isToday) dotClasses.push("today-marker");
+          const checkIcon = `<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+          weekContainer.innerHTML += `
+            <div class="weekly-day">
+              <div class="${dotClasses.join(" ")}">${isActive ? checkIcon : ""}</div>
+              <span class="weekly-day-name">${WEEK_DAYS_SHORT[i]}</span>
+            </div>`;
+        });
+
+        // Today card
+        const status = state.today.status;
+        const badge = document.getElementById("today-badge");
+        const todayTheme = document.getElementById("today-theme");
+        const practiceBtn = document.getElementById("practice-btn");
+        const talkBtn = document.getElementById("talk-btn");
+        const highlightsEl = document.getElementById("highlights");
+
+        todayTheme.textContent = "День " + state.today.dayNumber + " — " + state.today.dayLabel;
+
+        const badgeMap = { none: "Не начато", active: "В процессе", completed: "Завершено" };
+        badge.textContent = badgeMap[status] || status;
+        badge.className = "today-badge " + status;
+
+        practiceBtn.disabled = status === "completed";
+
+        if (status === "none") {
+          practiceBtn.textContent = "Начать практику";
+          practiceBtn.style.display = "";
+          talkBtn.style.display = "none";
+        } else if (status === "active") {
+          practiceBtn.textContent = "Продолжить практику";
+          practiceBtn.style.display = "";
+          talkBtn.style.display = "none";
+        } else {
+          practiceBtn.textContent = "Завершено сегодня";
+          practiceBtn.style.display = "";
+          talkBtn.style.display = "";
+        }
+
+        // Highlights (only when completed)
+        if (status === "completed" && state.today.highlights) {
+          highlightsEl.style.display = "";
+          const h = state.today.highlights;
+          let html = "";
+          if (h.phrases && h.phrases.length > 0) {
+            html += `<div class="highlights-section">
+              <div class="highlights-section-title">Фразы</div>
+              <ul class="highlights-list">${h.phrases.map(p => `<li>${p}</li>`).join("")}</ul>
+            </div>`;
+          }
+          if (h.corrections && h.corrections.length > 0) {
+            html += `<div class="highlights-section">
+              <div class="highlights-section-title">Исправления</div>
+              <ul class="highlights-list">${h.corrections.map(c => `<li>${c}</li>`).join("")}</ul>
+            </div>`;
+          }
+          if (h.encouragement) {
+            html += `<div class="highlights-encouragement">${h.encouragement}</div>`;
+          }
+          document.getElementById("highlights-body").innerHTML = html;
+        } else {
+          highlightsEl.style.display = "none";
+        }
+      }
+
+      // Highlights toggle
+      document.getElementById("highlights-toggle").addEventListener("click", () => {
+        document.getElementById("highlights").classList.toggle("open");
+      });
+
+      // Practice button: open deep link
+      document.getElementById("practice-btn").addEventListener("click", () => {
+        const url = "https://t.me/" + BOT_USERNAME + "?start=daily_practice";
+        openTgLink(url);
+        if (tg) setTimeout(() => tg.close(), 300);
+      });
+
+      // Talk button
+      document.getElementById("talk-btn").addEventListener("click", () => {
+        openTgLink("https://t.me/" + BOT_USERNAME);
+        if (tg) setTimeout(() => tg.close(), 300);
+      });
+
+      // Load progress data
+      async function loadProgress() {
+        // Default mock while loading
+        const mockState = {
+          streak: 0,
+          challengeCompletedCount: 0,
+          currentDayNumber: 1,
+          weeklyActiveDates: [],
+          today: { status: "none", dayNumber: 1, dayLabel: "Знакомство" }
+        };
+        renderProgress(mockState);
+
+        if (!tg || !tg.initData) return;
+
+        try {
+          const apiUrl = (API_BASE_URL || window.location.origin) + "/api/progress";
+          const res = await fetch(apiUrl, {
+            headers: { "Authorization": "TelegramInitData " + tg.initData }
+          });
+          if (!res.ok) return;
+          const state = await res.json();
+          renderProgress(state);
+        } catch (e) {
+          // Silently keep mock state
+          console.warn("Progress load failed:", e);
+        }
+      }
+
+      // Load progress when the tab is first opened
+      let progressLoaded = false;
+      document.querySelectorAll(".tab-btn").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          if (btn.dataset.tab === "progress" && !progressLoaded) {
+            progressLoaded = true;
+            loadProgress();
+          }
+        });
+      });
+      if (initialTab === "progress") {
+        progressLoaded = true;
+        loadProgress();
+      }
     </script>
   </body>
 </html>

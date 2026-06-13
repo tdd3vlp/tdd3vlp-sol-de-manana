@@ -39,6 +39,11 @@ const mockChat = {
   dailyResetAt: new Date(),
   customerEmail: null,
   pendingPaymentPlan: null,
+  streakCount: 0,
+  lastStreakDate: null,
+  weeklyActiveDates: "[]",
+  weeklyResetAt: null,
+  challengeCompletedCount: 0,
   createdAt: new Date(),
   updatedAt: new Date(),
 };
