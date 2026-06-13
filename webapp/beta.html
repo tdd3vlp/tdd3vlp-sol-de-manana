@@ -1,0 +1,621 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
+    <title>Sol de Mañana</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+      :root {
+        --bg: #f7efe1;
+        --card-bg: #ffffff;
+        --accent: #d4751a;
+        --accent-dark: #a85510;
+        --text: #1c1c1e;
+        --text-sub: #7a6e64;
+        --border: #e8d9c4;
+        --border-basic: #d4751a;
+        --border-prem: #a85510;
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+      }
+
+      /* ── Header ── */
+      .header {
+        padding: 18px 16px 12px;
+        text-align: center;
+      }
+      .header-title {
+        font-size: 20px;
+        font-weight: 700;
+        color: var(--accent);
+        letter-spacing: -0.3px;
+      }
+
+      /* ── Tab nav ── */
+      .tab-nav {
+        display: flex;
+        background: var(--bg);
+        border-bottom: 1.5px solid var(--border);
+        position: sticky;
+        top: 0;
+        z-index: 10;
+      }
+      .tab-btn {
+        flex: 1;
+        padding: 10px 0;
+        background: none;
+        border: none;
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--text-sub);
+        cursor: pointer;
+        border-bottom: 2px solid transparent;
+        margin-bottom: -1.5px;
+        transition:
+          color 0.15s,
+          border-color 0.15s;
+        -webkit-tap-highlight-color: transparent;
+      }
+      .tab-btn.active {
+        color: var(--accent);
+        border-bottom-color: var(--accent);
+        font-weight: 600;
+      }
+
+      /* ── Tab panes ── */
+      .tab-pane {
+        display: none;
+        padding-bottom: 28px;
+      }
+      .tab-pane.active {
+        display: block;
+      }
+
+      /* ── Plans tab ── */
+      .plans-sub {
+        padding: 14px 16px 10px;
+        font-size: 13px;
+        color: var(--text-sub);
+        line-height: 1.55;
+        text-align: left;
+        margin: 0 auto;
+      }
+      .plans {
+        padding: 0 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .plan-card {
+        background: var(--card-bg);
+        border-radius: 16px;
+        border: 1.5px solid var(--border);
+        overflow: hidden;
+      }
+      .plan-card.basic {
+        border-color: var(--border-basic);
+      }
+      .plan-card.premium {
+        border-color: var(--border-prem);
+      }
+      .plan-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 14px 16px;
+        cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+        user-select: none;
+      }
+      .plan-info {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+      }
+      .plan-name-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .plan-name {
+        font-size: 16px;
+        font-weight: 700;
+      }
+      .badge {
+        font-size: 10px;
+        font-weight: 600;
+        padding: 2px 8px;
+        border-radius: 20px;
+        letter-spacing: 0.2px;
+      }
+      .badge-basic {
+        background: #fef3c7;
+        color: #92400e;
+      }
+      .badge-premium {
+        background: #fde8d0;
+        color: #7c2d12;
+      }
+      .plan-price {
+        font-size: 13px;
+        color: var(--text-sub);
+      }
+      .plan-arrow {
+        flex-shrink: 0;
+        width: 28px;
+        height: 28px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--text-sub);
+        transition: transform 0.25s ease;
+      }
+      .plan-card.open .plan-arrow {
+        transform: rotate(180deg);
+      }
+      .plan-body {
+        max-height: 0;
+        overflow: hidden;
+        transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+      .plan-card.open .plan-body {
+        max-height: 700px;
+      }
+      .plan-body-inner {
+        padding: 0 16px 16px;
+      }
+      .plan-divider {
+        height: 1px;
+        background: var(--border);
+        margin-bottom: 13px;
+      }
+      .plan-tagline {
+        font-size: 13px;
+        color: var(--text-sub);
+        line-height: 1.55;
+        margin-bottom: 12px;
+      }
+      .plan-features {
+        list-style: none;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-bottom: 16px;
+      }
+      .plan-features li {
+        font-size: 13px;
+        line-height: 1.45;
+        display: flex;
+        gap: 8px;
+      }
+      .plan-features li::before {
+        content: "✓";
+        color: var(--accent);
+        font-weight: 700;
+        flex-shrink: 0;
+      }
+      .plan-cta {
+        width: 100%;
+        padding: 13px;
+        border: none;
+        border-radius: 10px;
+        font-size: 15px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: opacity 0.15s;
+        -webkit-tap-highlight-color: transparent;
+      }
+      .plan-cta:active {
+        opacity: 0.72;
+      }
+      .cta-free {
+        background: #efe4d0;
+        color: var(--accent-dark);
+      }
+      .cta-basic {
+        background: var(--accent);
+        color: #fff;
+      }
+      .cta-premium {
+        background: var(--accent-dark);
+        color: #fff;
+      }
+      .cta-card {
+        background: var(--card-bg);
+        color: var(--accent-dark);
+        border: 1.5px solid var(--border-basic);
+      }
+      .plan-cta + .plan-cta {
+        margin-top: 8px;
+      }
+
+      /* ── Tips tab ── */
+      .tips-section {
+        padding: 16px 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .tips-title {
+        font-size: 15px;
+        font-weight: 600;
+        color: var(--text);
+        margin-bottom: 2px;
+      }
+      .tip-card {
+        background: var(--card-bg);
+        border-radius: 14px;
+        border: 1.5px solid var(--border);
+        padding: 14px 16px;
+        font-size: 14px;
+        line-height: 1.55;
+        color: var(--text);
+      }
+      .tip-card strong {
+        display: block;
+        margin-bottom: 4px;
+        font-size: 13px;
+        color: var(--accent);
+        font-weight: 600;
+      }
+
+      /* ── Contacts tab ── */
+      .contacts-section {
+        padding: 16px 12px;
+      }
+      .contacts-card {
+        background: var(--card-bg);
+        border-radius: 16px;
+        border: 1.5px solid var(--border);
+        padding: 22px 16px;
+        text-align: center;
+      }
+      .contacts-title {
+        font-size: 17px;
+        font-weight: 700;
+        color: var(--text);
+        margin-bottom: 10px;
+      }
+      .contacts-desc {
+        font-size: 14px;
+        color: var(--text-sub);
+        line-height: 1.6;
+        margin-bottom: 20px;
+        text-align: left;
+      }
+      .contacts-btn {
+        display: block;
+        width: 100%;
+        padding: 13px;
+        background: var(--accent);
+        color: #fff;
+        border: none;
+        border-radius: 10px;
+        font-size: 15px;
+        font-weight: 600;
+        cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+        transition: opacity 0.15s;
+      }
+      .contacts-btn:active {
+        opacity: 0.72;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+      <div class="header-title">Sol de Mañana</div>
+    </div>
+
+    <div class="tab-nav">
+      <button class="tab-btn" data-tab="plans">Тарифы</button>
+      <button class="tab-btn" data-tab="tips">Советы</button>
+      <button class="tab-btn" data-tab="contacts">Контакты</button>
+    </div>
+
+    <!-- ── Plans tab ── -->
+    <div class="tab-pane" id="tab-plans">
+      <p class="plans-sub">
+        Выберите тариф и начните практиковать испанский уже сегодня:
+      </p>
+
+      <div class="plans">
+        <div class="plan-card" data-plan="free">
+          <div class="plan-header">
+            <div class="plan-info">
+              <div class="plan-name-row">
+                <span class="plan-name">Free</span>
+              </div>
+              <span class="plan-price">Бесплатно</span>
+            </div>
+            <div class="plan-arrow">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <path
+                  d="M4 6l4 4 4-4"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+            </div>
+          </div>
+          <div class="plan-body">
+            <div class="plan-body-inner">
+              <div class="plan-divider"></div>
+              <p class="plan-tagline">
+                Знакомство с <i>Sol</i> и первые короткие практики.
+              </p>
+              <ul class="plan-features">
+                <li>10 сообщений в день</li>
+                <li>Базовая модель GPT-4o mini</li>
+                <li>Исправление ошибок в испанских фразах</li>
+                <li>Готовые темы для повседневных ситуаций в Испании</li>
+              </ul>
+              <button class="plan-cta cta-free" data-action="free">
+                Начать бесплатно
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="plan-card basic" data-plan="basic">
+          <div class="plan-header">
+            <div class="plan-info">
+              <div class="plan-name-row">
+                <span class="plan-name">Basic</span>
+                <span class="badge badge-basic">Оптимально для старта</span>
+              </div>
+              <span class="plan-price">299 ₽ / 200 ⭐ в месяц</span>
+            </div>
+            <div class="plan-arrow">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <path
+                  d="M4 6l4 4 4-4"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+            </div>
+          </div>
+          <div class="plan-body">
+            <div class="plan-body-inner">
+              <div class="plan-divider"></div>
+              <p class="plan-tagline">
+                Регулярная практика с сильной языковой моделью.
+              </p>
+              <ul class="plan-features">
+                <li>100 сообщений в день</li>
+                <li>Продвинутая модель GPT-4o</li>
+                <li>Наиболее естественные ответы в диалоге</li>
+                <li>Более точные исправления грамматики, пунктуации и стиля</li>
+                <li>
+                  Выбор готовых тем: переезд, квартира, кафе, документы, врач,
+                  транспорт и другие
+                </li>
+              </ul>
+              <button class="plan-cta cta-basic" data-action="pay:basic">
+                Оплатить 200 ⭐ — Telegram Stars
+              </button>
+              <button class="plan-cta cta-card" data-action="card:basic">
+                Оплатить 299 ₽ — Карта/СБП
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="plan-card premium" data-plan="premium">
+          <div class="plan-header">
+            <div class="plan-info">
+              <div class="plan-name-row">
+                <span class="plan-name">Premium</span>
+                <span class="badge badge-premium">Максимум возможностей</span>
+              </div>
+              <span class="plan-price">899 ₽ / 600 ⭐ в месяц</span>
+            </div>
+            <div class="plan-arrow">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <path
+                  d="M4 6l4 4 4-4"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+            </div>
+          </div>
+          <div class="plan-body">
+            <div class="plan-body-inner">
+              <div class="plan-divider"></div>
+              <p class="plan-tagline">
+                Максимум возможностей для тех, кто стремится к результату.
+              </p>
+              <ul class="plan-features">
+                <li>300 сообщений в день</li>
+                <li>Продвинутая модель GPT-4o</li>
+                <li>Все возможности Basic</li>
+                <li>Режим перевода: Русский язык ↔ Испанский язык</li>
+                <li>Своя тема для разговора</li>
+                <li>
+                  Больше пространства для длинных диалогов и ежедневной практики
+                </li>
+                <li>
+                  Подготовка к реальным ситуациям: аренда, документы,
+                  собеседования, медицина, общение с соседями
+                </li>
+              </ul>
+              <button class="plan-cta cta-premium" data-action="pay:premium">
+                Оплатить 600 ⭐ — Telegram Stars
+              </button>
+              <button class="plan-cta cta-card" data-action="card:premium">
+                Оплатить 899 ₽ — Карта/СБП
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Tips tab ── -->
+    <div class="tab-pane" id="tab-tips">
+      <div class="tips-section">
+        <div class="tips-title">Как заниматься эффективно</div>
+        <div class="tip-card">
+          <strong>Пишите полными предложениями</strong>
+          Развёрнутые ответы способствуют изучению языка.
+        </div>
+        <div class="tip-card">
+          <strong>Не бойтесь ошибаться</strong>
+          Старайтесь отвечать на испанском — <i>Sol</i> выделит ошибки и покажет
+          правильный вариант.
+        </div>
+        <div class="tip-card">
+          <strong>Личный помощник</strong>
+          Если не знаете, как сказать по-испански — пишите по-русски или
+          смешивайте языки. <i>Sol</i> переведёт и продолжит диалог.
+        </div>
+        <div class="tip-card">
+          <strong>Общайтесь на разные темы</strong>
+          Выбирайте новые темы через кнопку «Выбор темы» — это помогает изучать
+          разную лексику: кафе, квартира, врач, документы и прочее.
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Contacts tab ── -->
+    <div class="tab-pane" id="tab-contacts">
+      <div class="contacts-section">
+        <div class="contacts-card">
+          <div class="contacts-title">Есть вопросы?</div>
+          <p class="contacts-desc">
+            Если у вас возникли вопросы или предложения — напишите менеджеру.
+            Отвечаем в течение 24 часов.
+          </p>
+          <button class="contacts-btn" id="manager-btn">
+            Написать менеджеру
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const tg = window.Telegram?.WebApp;
+
+      if (tg) {
+        tg.ready();
+        tg.expand();
+        tg.setBackgroundColor("#F7EFE1");
+        tg.setHeaderColor("#F7EFE1");
+      }
+
+      // Tab routing
+      function showTab(name) {
+        document.querySelectorAll(".tab-btn").forEach((b) => {
+          b.classList.toggle("active", b.dataset.tab === name);
+        });
+        document.querySelectorAll(".tab-pane").forEach((p) => {
+          p.classList.toggle("active", p.id === "tab-" + name);
+        });
+      }
+
+      const validTabs = ["plans", "tips", "contacts"];
+      const initialTab = validTabs.includes(window.location.hash.slice(1))
+        ? window.location.hash.slice(1)
+        : "plans";
+      showTab(initialTab);
+
+      document.querySelectorAll(".tab-btn").forEach((btn) => {
+        btn.addEventListener("click", () => showTab(btn.dataset.tab));
+      });
+
+      // Plan accordion
+      document.querySelectorAll(".plan-header").forEach((header) => {
+        header.addEventListener("click", () => {
+          const card = header.closest(".plan-card");
+          const isOpen = card.classList.contains("open");
+          document
+            .querySelectorAll(".plan-card.open")
+            .forEach((c) => c.classList.remove("open"));
+          if (!isOpen) card.classList.add("open");
+        });
+      });
+
+      // Plan CTA
+      document.querySelectorAll(".plan-cta").forEach((btn) => {
+        btn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const action = btn.dataset.action;
+          if (action === "free") {
+            tg ? tg.close() : window.close();
+            return;
+          }
+          if (action.startsWith("card:")) {
+            const plan = action.replace("card:", "");
+            btn.disabled = true;
+            btn.textContent = "Счёт отправляем в чат…";
+            openTgLink(
+              "https://t.me/soldemanana_bot?start=pay_" + plan + "_yookassa",
+            );
+            setTimeout(() => {
+              if (tg) tg.close();
+            }, 400);
+            return;
+          }
+          const plan = action.replace("pay:", "");
+          // Reusable Stars subscription invoice links (30 days, auto-renew),
+          // created once via createInvoiceLink. The amount is baked into the
+          // link: after any change to PLAN_PRICES_STARS (src/subscription/
+          // plans.ts) these links must be re-created, or pre-checkout will
+          // reject every payment started from the WebApp.
+          const invoiceLinks = {
+            basic: "https://t.me/$VqZG4N3PUUl5GAAAY9rDt4JlueY",
+            premium: "https://t.me/$agEqnt3PUUl6GAAAhqTPklvmbaI",
+          };
+          if (tg && typeof tg.openInvoice === "function") {
+            // Payment sheet opens inside the Mini App on every platform,
+            // including the macOS client where /start deep links are unreliable.
+            tg.openInvoice(invoiceLinks[plan], (status) => {
+              if (status === "paid") tg.close();
+            });
+            return;
+          }
+          // Fallback for old clients: /start deep link → bot sends the invoice.
+          openTgLink("https://t.me/soldemanana_bot?start=pay_" + plan);
+        });
+      });
+
+      // The native macOS client ignores openTelegramLink (known client bug),
+      // but intercepts a plain t.me navigation just fine.
+      function openTgLink(url) {
+        if (tg && tg.platform !== "macos") {
+          tg.openTelegramLink(url);
+        } else {
+          window.open(url, "_blank");
+        }
+      }
+
+      // Manager contact
+      document.getElementById("manager-btn").addEventListener("click", () => {
+        openTgLink("https://t.me/tdd3vlp");
+      });
+    </script>
+  </body>
+</html>

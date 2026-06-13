@@ -25,6 +25,7 @@ export const config = {
     .map((s) => s.trim())
     .filter(Boolean),
   webAppUrl: process.env.WEBAPP_URL ?? "",
+  webAppBetaUrl: process.env.WEBAPP_BETA_URL ?? "",
   // Legacy Telegram Payments provider token (kept for reference, no longer used for RUB)
   yookassaProviderToken: process.env.YOOKASSA_PROVIDER_TOKEN ?? "",
   // Direct ЮKassa API (replaces provider token for RUB payments)

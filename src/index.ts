@@ -18,18 +18,6 @@ bot.catch((err) => {
 const server = startWebhookServer(bot);
 
 async function main() {
-  if (config.webAppUrl) {
-    try {
-      await bot.api.setChatMenuButton({
-        menu_button: { type: "web_app", text: "Menu", web_app: { url: config.webAppUrl } },
-      });
-      console.log("Web App menu button set.");
-    } catch (err) {
-      console.error("Failed to set menu button:", err);
-    }
-  } else {
-    await bot.api.setMyCommands([]);
-  }
   bot.start();
   console.log("Sol de Mañana is running...");
 }

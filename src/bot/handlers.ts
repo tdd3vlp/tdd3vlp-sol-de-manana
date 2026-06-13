@@ -41,6 +41,7 @@ import {
   getEffectivePlan,
   PLAN_LIMITS,
   isAdminUser,
+  isBetaUser,
 } from "../subscription/plans.js";
 import { config } from "../config/env.js";
 import {
@@ -458,7 +459,24 @@ export async function handleStart(ctx: Context): Promise<void> {
   const theme = pickRandomTheme();
   await resetChat(telegramChatId, theme);
 
+  const telegramUserId = ctx.from?.id?.toString();
   const firstName = ctx.from?.first_name ?? "друг";
+
+  const webAppUrl =
+    telegramUserId && isBetaUser(telegramUserId) && config.webAppBetaUrl
+      ? config.webAppBetaUrl
+      : config.webAppUrl;
+
+  if (webAppUrl && ctx.chat?.id) {
+    try {
+      await ctx.api.setChatMenuButton({
+        chat_id: ctx.chat.id,
+        menu_button: { type: "web_app", text: "Menu", web_app: { url: webAppUrl } },
+      });
+    } catch (err) {
+      console.error("Failed to set per-chat menu button:", err);
+    }
+  }
 
   await ctx.replyWithSticker(WELCOME_STICKER_ID);
   await ctx.reply(
