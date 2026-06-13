@@ -78,6 +78,9 @@ export interface PracticeHighlights {
   usefulPhrases: string[];
   whatWentWell: string;
   focusArea: string;
+  languageNote: string;
+  cultureNote: string;
+  nextPracticeHint: string;
   encouragement: string;
   // legacy fields kept for backward compat with old DB records
   topic?: string;

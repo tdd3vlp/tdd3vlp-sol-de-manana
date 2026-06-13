@@ -1165,10 +1165,16 @@ async function trackDailyPracticeProgress(
           { role: "user" as const, content: userText },
           { role: "assistant" as const, content: rawSolResponse },
         ];
+        const isPremiumForHighlights =
+          getEffectivePlan(chat) === "premium" ||
+          (telegramUserId != null && isAdminUser(telegramUserId));
+        const highlightsModel = isPremiumForHighlights
+          ? config.openaiModelPremiumHighlights
+          : config.openaiModelHighlights;
         const highlights = await callDialogueHighlights(
           historyWithCurrentTurn,
           chat.currentTheme,
-          model,
+          highlightsModel,
         );
         const dayNumber = computeDayNumber(freshChat);
         const theme = getThemeForDay(dayNumber);

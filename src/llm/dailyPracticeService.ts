@@ -122,9 +122,12 @@ export async function callDailyPractice(
 const FALLBACK_HIGHLIGHTS: DailyPracticeHighlights = {
   summary: "Сегодня прошла хорошая практика испанского языка.",
   mistakes: [],
-  usefulPhrases: [],
+  usefulPhrases: ["hablar con alguien — поговорить с кем-то", "¿Qué te parece? — Как тебе кажется?"],
   whatWentWell: "Ты старался и продолжал разговор.",
   focusArea: "Продолжай практиковать акцентные знаки.",
+  languageNote: "Глагол estar используется для временных состояний, а ser — для постоянных характеристик.",
+  cultureNote: "В Испании принято здороваться с соседями и продавцами — это часть повседневной культуры общения.",
+  nextPracticeHint: "Попробуй описать своё утро по-испански, используя глаголы в настоящем времени.",
   encouragement: "Отличная работа сегодня!",
 };
 
@@ -161,7 +164,7 @@ export async function callDialogueHighlights(
           {
             role: "user",
             content:
-              "Your previous response was invalid. Return valid JSON matching the required schema with summary, mistakes, usefulPhrases, whatWentWell, focusArea, and encouragement fields.",
+              "Your previous response was invalid. Return valid JSON matching the required schema with summary, mistakes, usefulPhrases, whatWentWell, focusArea, languageNote, cultureNote, nextPracticeHint, and encouragement fields.",
           },
         ],
         response_format: zodResponseFormat(DailyPracticeHighlightsSchema, "daily_practice_highlights"),
@@ -212,7 +215,7 @@ export async function callDailyPracticeFinale(
           {
             role: "user",
             content:
-              "Your previous response was invalid. Return valid JSON matching the required schema with summary, mistakes, usefulPhrases, whatWentWell, focusArea, and encouragement fields.",
+              "Your previous response was invalid. Return valid JSON matching the required schema with summary, mistakes, usefulPhrases, whatWentWell, focusArea, languageNote, cultureNote, nextPracticeHint, and encouragement fields.",
           },
         ],
         response_format: zodResponseFormat(DailyPracticeHighlightsSchema, "daily_practice_highlights"),

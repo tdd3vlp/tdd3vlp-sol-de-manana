@@ -523,7 +523,7 @@
         transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
       }
       .highlights.open .highlights-body {
-        max-height: 400px;
+        max-height: 1600px;
       }
       .highlights-section {
         margin-top: 12px;
@@ -1115,10 +1115,29 @@
               <div class="highlights-section-title">Ошибки</div>
               <ul class="highlights-list">${h.mistakes.map(m => `<li>${escapeHtml(m)}</li>`).join("")}</ul>
             </div>`;
-          } else if (h.usefulPhrases && h.usefulPhrases.length > 0) {
+          }
+          if (h.usefulPhrases && h.usefulPhrases.length > 0) {
             html += `<div class="highlights-section">
               <div class="highlights-section-title">Полезные фразы</div>
               <ul class="highlights-list">${h.usefulPhrases.map(p => `<li>${escapeHtml(p)}</li>`).join("")}</ul>
+            </div>`;
+          }
+          if (h.languageNote) {
+            html += `<div class="highlights-section">
+              <div class="highlights-section-title">Языковая заметка</div>
+              <div class="highlights-text">${escapeHtml(h.languageNote)}</div>
+            </div>`;
+          }
+          if (h.cultureNote) {
+            html += `<div class="highlights-section">
+              <div class="highlights-section-title">Контекст</div>
+              <div class="highlights-text">${escapeHtml(h.cultureNote)}</div>
+            </div>`;
+          }
+          if (h.nextPracticeHint) {
+            html += `<div class="highlights-section">
+              <div class="highlights-section-title">Что попробовать дальше</div>
+              <div class="highlights-text">${escapeHtml(h.nextPracticeHint)}</div>
             </div>`;
           }
           if (h.encouragement) {

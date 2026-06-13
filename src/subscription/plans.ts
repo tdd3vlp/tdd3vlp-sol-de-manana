@@ -8,12 +8,13 @@ export const PLAN_LIMITS = {
 
 export type Plan = keyof typeof PLAN_LIMITS;
 
+// All plans use the same dialogue model; highlights use a separate per-plan config.
 // Fallbacks repeat the env.ts defaults so partial config mocks in tests
 // cannot produce an undefined model.
 export const PLAN_MODELS: Record<Plan, string> = {
-  free: config.openaiModelFree ?? "gpt-4o-mini",
-  basic: config.openaiModelPaid ?? "gpt-4o",
-  premium: config.openaiModelPaid ?? "gpt-4o",
+  free: config.openaiModelDialogue ?? "gpt-4o-mini",
+  basic: config.openaiModelDialogue ?? "gpt-4o-mini",
+  premium: config.openaiModelDialogue ?? "gpt-4o-mini",
 };
 
 // Admins always get the premium model regardless of their chat's plan.

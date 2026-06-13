@@ -12,8 +12,12 @@ export const config = {
   telegramBotToken: requireEnv("TELEGRAM_BOT_TOKEN"),
   openaiApiKey: requireEnv("OPENAI_API_KEY"),
   openaiModelFree: process.env.OPENAI_MODEL_FREE ?? "gpt-4o-mini",
+  // openaiModelPaid is kept as legacy; dialogue now uses openaiModelDialogue for all plans.
   openaiModelPaid: process.env.OPENAI_MODEL_PAID ?? "gpt-4o",
   openaiModelTranslate: process.env.OPENAI_MODEL_TRANSLATE ?? "gpt-4o-mini",
+  openaiModelDialogue: process.env.OPENAI_MODEL_DIALOGUE ?? "gpt-4o-mini",
+  openaiModelHighlights: process.env.OPENAI_MODEL_HIGHLIGHTS ?? "gpt-4o-mini",
+  openaiModelPremiumHighlights: process.env.OPENAI_MODEL_PREMIUM_HIGHLIGHTS ?? "gpt-4o",
   databaseUrl: requireEnv("DATABASE_URL"),
   nodeEnv: process.env.NODE_ENV ?? "development",
   adminTelegramIds: (process.env.ADMIN_TELEGRAM_IDS ?? "")

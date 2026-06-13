@@ -20,6 +20,9 @@ vi.mock("../src/config/env.js", () => ({
     openaiModelFree: "gpt-4o-mini",
     openaiModelPaid: "gpt-4o",
     openaiModelTranslate: "gpt-4o-mini",
+    openaiModelDialogue: "gpt-4o-mini",
+    openaiModelHighlights: "gpt-4o-mini",
+    openaiModelPremiumHighlights: "gpt-4o",
     telegramBotToken: "test-token",
     nodeEnv: "test",
   },
@@ -401,9 +404,12 @@ describe("getProgressState", () => {
     const highlights = {
       summary: "Сегодня говорили о том, как спрашивать дорогу в городе.",
       mistakes: ["написал al playa → правильно a la playa"],
-      usefulPhrases: [],
+      usefulPhrases: ["¿Dónde está...? — Где находится...?"],
       whatWentWell: "Хорошо использовал предлоги",
       focusArea: "Поработать над произношением",
+      languageNote: "Слово 'playa' — женского рода: la playa.",
+      cultureNote: "В Испании направления часто дают через ориентиры, а не улицы.",
+      nextPracticeHint: "Попробуй описать маршрут от дома до ближайшего магазина.",
       encouragement: "Отлично!",
     };
     const session = {

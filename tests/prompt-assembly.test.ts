@@ -82,6 +82,25 @@ describe("buildSystemPrompt", () => {
   });
 });
 
+describe("buildSystemPrompt — dialogue quality rules", () => {
+  it("requires open-ended questions and forbids yes/no questions", () => {
+    const prompt = buildSystemPrompt("supermarket");
+    expect(prompt).toContain("yes/no");
+    expect(prompt).toContain("open-ended");
+  });
+
+  it("instructs to stay on topic for 2-3 exchanges before moving on", () => {
+    const prompt = buildSystemPrompt("supermarket");
+    expect(prompt).toContain("2-3 exchanges");
+  });
+
+  it("instructs to avoid empty praise", () => {
+    const prompt = buildSystemPrompt("supermarket");
+    expect(prompt).toContain("Excelente");
+    expect(prompt).toContain("praise");
+  });
+});
+
 describe("wrapCurrentUserMessage", () => {
   it("wraps text in the marker tags", () => {
     expect(wrapCurrentUserMessage("Hola.")).toBe(
