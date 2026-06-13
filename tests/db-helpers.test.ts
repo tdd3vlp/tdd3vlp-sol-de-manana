@@ -44,6 +44,9 @@ const mockChat = {
   weeklyActiveDates: "[]",
   weeklyResetAt: null,
   challengeCompletedCount: 0,
+  dailyPracticeSentenceCount: 0,
+  dailyPracticeCompletedAt: null,
+  dailyPracticeResetAt: null,
   createdAt: new Date(),
   updatedAt: new Date(),
 };

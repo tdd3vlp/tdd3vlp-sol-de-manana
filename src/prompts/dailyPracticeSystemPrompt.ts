@@ -87,6 +87,20 @@ ${SPANISH_LANGUAGE_CLASSIFICATION_RULES}
 - continuation: string (ends with exactly one open-ended question, except unsupported/nonsense)`;
 }
 
+export function buildDialogueHighlightsPrompt(theme: string): string {
+  const safeTheme = sanitizeTheme(theme);
+  return `You are Sol de Mañana. The user just completed their daily practice goal through a natural dialogue session on the theme "${safeTheme}".
+
+Review the conversation above and produce a JSON summary with these fields:
+- topic: the main topic practiced today, stated in Russian (e.g. "Переезд в Испанию")
+- subtopics: array of 2-4 specific subtopics or phrases the user practiced, in Russian
+- whatWentWell: one sentence in Russian describing what the user did well (vocabulary, sentence structure, confidence, etc.)
+- focusArea: one sentence in Russian naming the single most important area to improve (a specific grammar point, word, or habit)
+- encouragement: one short encouraging sentence in Russian
+
+Keep everything concise. The encouragement must be warm and personal.`;
+}
+
 export function buildDailyPracticeFinalePrompt(
   theme: string,
   dayLabel: string,

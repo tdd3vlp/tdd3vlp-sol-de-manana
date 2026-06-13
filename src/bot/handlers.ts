@@ -29,6 +29,7 @@ import {
   callDailyPracticeStart,
   callDailyPractice,
   callDailyPracticeFinale,
+  callDialogueHighlights,
 } from "../llm/dailyPracticeService.js";
 import {
   getTodaySession,
@@ -39,8 +40,14 @@ import {
   updateStreakAndWeekly,
   computeDayNumber,
   getThemeForDay,
+  getTodayDateStringUTC3,
+  resetDailyPracticeIfNewDay,
+  incrementDailySentenceCount,
+  markDailyPracticeCompleted,
 } from "../db/practiceSession.js";
+import { countSentences } from "../conversation/sentenceCounter.js";
 import { buildLLMContext } from "../conversation/context.js";
+import { prisma } from "../db/prisma.js";
 import {
   isKnownTheme,
   pickRandomTheme,
@@ -73,22 +80,10 @@ const BTN_TOPIC_MENU = "Выбор темы";
 const BTN_MODE_TRANSLATION = "Режим перевода";
 const BTN_MODE_DIALOGUE = "Режим диалога";
 const BTN_CUSTOM_TOPIC = "Своя тема";
-const BTN_DAILY_PRACTICE = "Практика дня";
-
-export function buildDialogueKeyboard(
-  plan: string,
-  userId?: string,
-  options: { showDailyPractice?: boolean } = {},
-): Keyboard {
-  const showDailyPractice =
-    !!(userId && isBetaUser(userId)) && options.showDailyPractice !== false;
-
+export function buildDialogueKeyboard(plan: string, userId?: string): Keyboard {
   const kb = new Keyboard().text(BTN_TOPIC_MENU);
   if (plan === "premium" || (userId && isAdminUser(userId))) {
     kb.text(BTN_MODE_TRANSLATION);
-  }
-  if (showDailyPractice) {
-    kb.row().text(BTN_DAILY_PRACTICE);
   }
   return kb.resized().persistent();
 }
@@ -485,15 +480,6 @@ export async function handleStart(ctx: Context): Promise<void> {
   const telegramUserId = ctx.from?.id?.toString();
   const firstName = ctx.from?.first_name ?? "друг";
 
-  // Daily practice handoff from Mini App via Telegram start payload.
-  if (payload === "daily_practice") {
-    if (telegramUserId && isBetaUser(telegramUserId)) {
-      const dpChat = await getOrCreateChat(telegramChatId, pickRandomTheme());
-      await handleDailyPracticeButton(ctx, dpChat, telegramUserId);
-      return;
-    }
-  }
-
   const theme = pickRandomTheme();
   await resetChat(telegramChatId, theme);
 
@@ -530,13 +516,6 @@ async function enterDialogueMode(ctx: Context): Promise<void> {
   let chat = await getOrCreateChat(telegramChatId, pickRandomTheme());
   await updateChatMode(chat.id, "dialogue");
 
-  // For beta users: hide "Практика дня" if today's session is already completed.
-  let showDailyPractice = !!(telegramUserId && isBetaUser(telegramUserId));
-  if (showDailyPractice) {
-    const todaySession = await getTodaySession(chat.id);
-    showDailyPractice = todaySession?.status !== "completed";
-  }
-
   const {
     allowed,
     consumed,
@@ -558,7 +537,7 @@ async function enterDialogueMode(ctx: Context): Promise<void> {
       ctx,
       rawText,
       response,
-      buildDialogueKeyboard(chat.plan, telegramUserId, { showDailyPractice }),
+      buildDialogueKeyboard(chat.plan, telegramUserId),
     );
     await saveDeliveredMessages(
       chat.id,
@@ -1145,6 +1124,96 @@ async function handleEmailInput(
   await createAndSendYooKassaLink(ctx, plan, telegramChatId, email);
 }
 
+// ─── Auto daily-practice tracking ─────────────────────────────────────────────
+
+const DAILY_PRACTICE_GOAL = 10;
+
+async function trackDailyPracticeProgress(
+  chat: Awaited<ReturnType<typeof getOrCreateChat>>,
+  userText: string,
+  inputLanguage: string,
+  llmHistory: import("../conversation/context.js").LLMMessage[],
+  rawSolResponse: string,
+  model: string,
+  telegramChatId: string,
+  api: SendMessageApi,
+): Promise<void> {
+  try {
+    if (inputLanguage === "unsupported" || inputLanguage === "nonsense") return;
+
+    const today = getTodayDateStringUTC3();
+    if (chat.dailyPracticeCompletedAt !== null) {
+      const completedDay = getTodayDateStringUTC3(chat.dailyPracticeCompletedAt);
+      if (completedDay === today) return;
+    }
+
+    const freshChat = await resetDailyPracticeIfNewDay(chat.id);
+    const delta = countSentences(userText);
+    const updatedChat = await incrementDailySentenceCount(chat.id, delta);
+
+    if (updatedChat.dailyPracticeSentenceCount < DAILY_PRACTICE_GOAL) return;
+
+    const { marked } = await markDailyPracticeCompleted(chat.id);
+    if (!marked) return;
+
+    await updateStreakAndWeekly(freshChat, chat.id);
+
+    const newStreak = freshChat.streakCount + 1;
+    const completionText =
+      `Практика дня выполнена.\n\nТы набрал минимальный ритм на сегодня. Подробная сводка появится в Mini App.\n\nСерия: ${newStreak} ${pluralDays(newStreak)} подряд.`;
+    await api.sendMessage(telegramChatId, completionText);
+
+    void (async () => {
+      try {
+        const historyWithCurrentTurn = [
+          ...llmHistory,
+          { role: "user" as const, content: userText },
+          { role: "assistant" as const, content: rawSolResponse },
+        ];
+        const highlights = await callDialogueHighlights(
+          historyWithCurrentTurn,
+          chat.currentTheme,
+          model,
+        );
+        const dayNumber = computeDayNumber(freshChat);
+        const theme = getThemeForDay(dayNumber);
+        const dateString = getTodayDateStringUTC3();
+        await prisma.practiceSession.upsert({
+          where: { chatId_date: { chatId: chat.id, date: dateString } },
+          create: {
+            chatId: chat.id,
+            date: dateString,
+            dayNumber,
+            theme,
+            stepCount: updatedChat.dailyPracticeSentenceCount,
+            status: "completed",
+            completedAt: new Date(),
+            highlights: JSON.stringify(highlights),
+          },
+          update: {
+            status: "completed",
+            completedAt: new Date(),
+            stepCount: updatedChat.dailyPracticeSentenceCount,
+            highlights: JSON.stringify(highlights),
+          },
+        });
+      } catch (err) {
+        console.error("trackDailyPracticeProgress background highlights failed:", err);
+      }
+    })();
+  } catch (err) {
+    console.error("trackDailyPracticeProgress failed:", err);
+  }
+}
+
+function pluralDays(n: number): string {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return "день";
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return "дня";
+  return "дней";
+}
+
 // ─── Main message handler ─────────────────────────────────────────────────────
 
 export async function handleMessage(ctx: Context): Promise<void> {
@@ -1170,21 +1239,12 @@ export async function handleMessage(ctx: Context): Promise<void> {
     await showTopicMenu(ctx, isPremium);
     return;
   }
-  if (userText === BTN_DAILY_PRACTICE) {
-    if (telegramUserId && isBetaUser(telegramUserId)) {
-      const dpChat = await getOrCreateChat(telegramChatId, pickRandomTheme());
-      await handleDailyPracticeButton(ctx, dpChat, telegramUserId);
-    }
-    return;
-  }
-
   let chat = await getOrCreateChat(telegramChatId, pickRandomTheme());
 
-  // Mode-specific input is routed before dialogue checks: translation allows
-  // longer text (500) and custom topics may contain English words.
+  // Migrate users still in the old daily_practice mode to dialogue.
   if (chat.mode === "daily_practice") {
-    await handleDailyPracticeMessage(ctx, chat, telegramUserId);
-    return;
+    await updateChatMode(chat.id, "dialogue");
+    chat = { ...chat, mode: "dialogue" };
   }
 
   if (chat.mode === "translation") {
@@ -1284,6 +1344,17 @@ export async function handleMessage(ctx: Context): Promise<void> {
         { role: "user", text: userText },
         { role: "assistant", text: rawText, llmJson: JSON.stringify(response) },
       ],
+      ctx.api,
+    );
+
+    void trackDailyPracticeProgress(
+      chat,
+      userText,
+      response.inputLanguage,
+      llmHistory,
+      rawText,
+      getPlanModel(getEffectivePlan(chat), telegramUserId),
+      telegramChatId,
       ctx.api,
     );
   } catch (error) {

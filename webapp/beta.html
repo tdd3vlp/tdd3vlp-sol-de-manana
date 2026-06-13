@@ -643,6 +643,7 @@
           </div>
           <div class="today-theme" id="today-theme"></div>
           <button class="practice-btn" id="practice-btn" disabled>Загрузка...</button>
+          <div class="today-hint" id="today-hint" style="display:none"></div>
           <div class="highlights" id="highlights" style="display:none">
             <div class="highlights-toggle" id="highlights-toggle">
               <span class="highlights-toggle-label">Итог практики</span>
@@ -1041,9 +1042,11 @@
         const badge = document.getElementById("today-badge");
         const todayTheme = document.getElementById("today-theme");
         const practiceBtn = document.getElementById("practice-btn");
+        const todayHint = document.getElementById("today-hint");
         const highlightsEl = document.getElementById("highlights");
 
-        todayTheme.textContent = "День " + state.today.dayNumber + " из 7";
+        const sentenceCount = state.today.sentenceCount ?? 0;
+        todayTheme.textContent = "Сегодня: " + sentenceCount + " / 10 предложений";
 
         const badgeMap = { none: "Не начато", active: "В процессе", completed: "Завершено" };
         badge.textContent = badgeMap[status] || status;
@@ -1051,12 +1054,14 @@
 
         practiceBtn.disabled = status === "completed";
 
-        if (status === "none") {
-          practiceBtn.textContent = "Начать в чате";
-        } else if (status === "active") {
-          practiceBtn.textContent = "Продолжить в чате";
-        } else {
+        if (status === "completed") {
           practiceBtn.textContent = "Завершено сегодня";
+          todayHint.textContent = "Минимальная практика дня выполнена.";
+          todayHint.style.display = "";
+        } else {
+          practiceBtn.textContent = "Открыть чат";
+          todayHint.textContent = "Пишите Sol в чате — практика засчитается автоматически.";
+          todayHint.style.display = "";
         }
 
         // Highlights (only when completed)
@@ -1102,9 +1107,9 @@
         document.getElementById("highlights").classList.toggle("open");
       });
 
-      // Practice button: open deep link
+      // Practice button: open chat (no special mode)
       document.getElementById("practice-btn").addEventListener("click", () => {
-        const url = "https://t.me/" + BOT_USERNAME + "?start=daily_practice";
+        const url = "https://t.me/" + BOT_USERNAME;
         openTgLink(url);
         if (tg) setTimeout(() => tg.close(), 300);
       });
@@ -1117,7 +1122,7 @@
           challengeCompletedCount: 0,
           currentDayNumber: 1,
           weeklyActiveDates: [],
-          today: { status: "none", dayNumber: 1, dayLabel: "Знакомство" }
+          today: { status: "none", dayNumber: 1, dayLabel: "Знакомство", sentenceCount: 0 }
         };
         renderProgress(mockState);
 

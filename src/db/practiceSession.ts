@@ -94,6 +94,51 @@ export async function completeSession(
   });
 }
 
+// ─── Auto daily-practice tracking (dialogue mode) ─────────────────────────────
+
+export async function resetDailyPracticeIfNewDay(
+  chatId: string,
+  now: Date = new Date(),
+): Promise<Chat> {
+  const todayStart = toUTC3Date(now);
+  // Only reset if the stored resetAt is before today's UTC+3 midnight.
+  await prisma.chat.updateMany({
+    where: {
+      id: chatId,
+      OR: [
+        { dailyPracticeResetAt: null },
+        { dailyPracticeResetAt: { lt: todayStart } },
+      ],
+    },
+    data: {
+      dailyPracticeSentenceCount: 0,
+      dailyPracticeCompletedAt: null,
+      dailyPracticeResetAt: todayStart,
+    },
+  });
+  return prisma.chat.findUniqueOrThrow({ where: { id: chatId } });
+}
+
+export async function incrementDailySentenceCount(
+  chatId: string,
+  delta: number,
+): Promise<Chat> {
+  return prisma.chat.update({
+    where: { id: chatId },
+    data: { dailyPracticeSentenceCount: { increment: delta } },
+  });
+}
+
+export async function markDailyPracticeCompleted(
+  chatId: string,
+): Promise<{ marked: boolean }> {
+  const result = await prisma.chat.updateMany({
+    where: { id: chatId, dailyPracticeCompletedAt: null },
+    data: { dailyPracticeCompletedAt: new Date() },
+  });
+  return { marked: result.count > 0 };
+}
+
 // ─── Streak & weekly progress ─────────────────────────────────────────────────
 
 export async function updateStreakAndWeekly(
@@ -160,6 +205,7 @@ export interface ProgressState {
     status: "none" | "active" | "completed";
     dayNumber: number;
     dayLabel: string;
+    sentenceCount: number;
     highlights?: PracticeHighlights;
   };
 }
@@ -172,8 +218,13 @@ export function getProgressState(
   let todayStatus: "none" | "active" | "completed" = "none";
   let highlights: PracticeHighlights | undefined;
 
-  if (todaySession) {
-    todayStatus = todaySession.status === "completed" ? "completed" : "active";
+  const today = getTodayDateStringUTC3();
+  const autoCompletedToday =
+    chat.dailyPracticeCompletedAt !== null &&
+    getTodayDateStringUTC3(chat.dailyPracticeCompletedAt) === today;
+
+  if (todaySession?.status === "completed") {
+    todayStatus = "completed";
     if (todaySession.highlights) {
       try {
         highlights = JSON.parse(todaySession.highlights) as PracticeHighlights;
@@ -181,6 +232,20 @@ export function getProgressState(
         // ignore malformed JSON
       }
     }
+  } else if (autoCompletedToday) {
+    // Auto-completed via dialogue; highlights appear once background upsert finishes.
+    todayStatus = "completed";
+    if (todaySession?.highlights) {
+      try {
+        highlights = JSON.parse(todaySession.highlights) as PracticeHighlights;
+      } catch {
+        // ignore malformed JSON
+      }
+    }
+  } else if (chat.dailyPracticeSentenceCount > 0) {
+    todayStatus = "active";
+  } else if (todaySession?.status === "active") {
+    todayStatus = "active";
   }
 
   return {
@@ -194,6 +259,7 @@ export function getProgressState(
       dayLabel:
         CHALLENGE_DAY_LABELS[todaySession?.dayNumber ?? dayNumber] ??
         `День ${todaySession?.dayNumber ?? dayNumber}`,
+      sentenceCount: chat.dailyPracticeSentenceCount,
       highlights,
     },
   };

@@ -108,32 +108,11 @@ describe("buildDialogueKeyboard", () => {
     return kb.keyboard.flat().map((b) => (typeof b === "string" ? b : (b as { text: string }).text));
   }
 
-  it("includes the Практика дня button for beta users (default)", () => {
-    expect(buttonTexts(buildDialogueKeyboard("free", "beta-1"))).toContain("Практика дня");
-  });
-
-  it("includes the Практика дня button for admin users (default)", () => {
-    expect(buttonTexts(buildDialogueKeyboard("free", "admin-1"))).toContain("Практика дня");
-  });
-
-  it("does not include Практика дня for regular users", () => {
+  it("never includes Практика дня button (removed from keyboard)", () => {
+    expect(buttonTexts(buildDialogueKeyboard("free", "beta-1"))).not.toContain("Практика дня");
+    expect(buttonTexts(buildDialogueKeyboard("free", "admin-1"))).not.toContain("Практика дня");
     expect(buttonTexts(buildDialogueKeyboard("free", "regular-999"))).not.toContain("Практика дня");
-  });
-
-  it("does not include Практика дня when userId is undefined", () => {
     expect(buttonTexts(buildDialogueKeyboard("premium", undefined))).not.toContain("Практика дня");
-  });
-
-  it("hides Практика дня for beta user when showDailyPractice=false", () => {
-    expect(
-      buttonTexts(buildDialogueKeyboard("free", "beta-1", { showDailyPractice: false })),
-    ).not.toContain("Практика дня");
-  });
-
-  it("does not show Практика дня for regular user even with showDailyPractice=true", () => {
-    expect(
-      buttonTexts(buildDialogueKeyboard("free", "regular-999", { showDailyPractice: true })),
-    ).not.toContain("Практика дня");
   });
 });
 
@@ -352,18 +331,36 @@ describe("computeDayNumber", () => {
 // ─── Progress state ────────────────────────────────────────────────────────────
 
 describe("getProgressState", () => {
-  it("returns zeroed state when no session today", () => {
+  it("returns zeroed state when no session today and no sentence count", () => {
     const chat = makeChat({ streakCount: 3, challengeCompletedCount: 1, weeklyActiveDates: '["2026-06-12"]' });
     const state = getProgressState(chat, null);
 
     expect(state.streak).toBe(3);
     expect(state.challengeCompletedCount).toBe(1);
     expect(state.today.status).toBe("none");
+    expect(state.today.sentenceCount).toBe(0);
     expect(state.weeklyActiveDates).toEqual(["2026-06-12"]);
   });
 
-  it("returns active status for an active session", () => {
-    const chat = makeChat({ streakCount: 2 });
+  it("returns active status when sentenceCount > 0 without a PracticeSession", () => {
+    const chat = makeChat({ streakCount: 2, dailyPracticeSentenceCount: 5 });
+    const state = getProgressState(chat, null);
+
+    expect(state.today.status).toBe("active");
+    expect(state.today.sentenceCount).toBe(5);
+  });
+
+  it("returns completed status when dailyPracticeCompletedAt is today, even without a PracticeSession", () => {
+    const todayUTC = new Date(); // now = today in UTC+3 for the test
+    const chat = makeChat({ dailyPracticeSentenceCount: 12, dailyPracticeCompletedAt: todayUTC });
+    const state = getProgressState(chat, null);
+
+    expect(state.today.status).toBe("completed");
+    expect(state.today.sentenceCount).toBe(12);
+  });
+
+  it("returns active status for a legacy active session", () => {
+    const chat = makeChat({ streakCount: 2, dailyPracticeSentenceCount: 0 });
     const session = {
       id: "sess-1",
       chatId: "chat-1",
@@ -381,10 +378,11 @@ describe("getProgressState", () => {
     expect(state.today.status).toBe("active");
     expect(state.today.dayNumber).toBe(3);
     expect(state.today.dayLabel).toBe("Супермаркет");
+    expect(state.today.sentenceCount).toBe(0);
   });
 
   it("returns completed status and highlights for a completed session", () => {
-    const chat = makeChat({ streakCount: 3 });
+    const chat = makeChat({ streakCount: 3, dailyPracticeSentenceCount: 8 });
     const highlights = {
       topic: "Directions",
       subtopics: ["Asking for directions"],
@@ -408,5 +406,6 @@ describe("getProgressState", () => {
 
     expect(state.today.status).toBe("completed");
     expect(state.today.highlights).toEqual(highlights);
+    expect(state.today.sentenceCount).toBe(8);
   });
 });

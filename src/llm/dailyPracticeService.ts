@@ -11,6 +11,7 @@ import {
   buildDailyPracticeStartPrompt,
   buildDailyPracticePrompt,
   buildDailyPracticeFinalePrompt,
+  buildDialogueHighlightsPrompt,
 } from "../prompts/dailyPracticeSystemPrompt.js";
 import {
   wrapCurrentUserMessage,
@@ -125,6 +126,53 @@ const FALLBACK_HIGHLIGHTS: DailyPracticeHighlights = {
   focusArea: "Продолжай практиковать акцентные знаки.",
   encouragement: "Отличная работа сегодня!",
 };
+
+export async function callDialogueHighlights(
+  history: LLMMessage[],
+  theme: string,
+  model: string,
+): Promise<DailyPracticeHighlights> {
+  const messages: ChatCompletionMessageParam[] = [
+    { role: "system", content: buildDialogueHighlightsPrompt(theme) },
+    ...history.map((m) => ({ role: m.role, content: m.content })),
+    { role: "user", content: "Подведи итог сессии." },
+  ];
+
+  try {
+    const completion = await openai.beta.chat.completions.parse({
+      model,
+      messages,
+      response_format: zodResponseFormat(DailyPracticeHighlightsSchema, "daily_practice_highlights"),
+      max_tokens: 400,
+    });
+    const parsed = completion.choices[0]?.message?.parsed;
+    if (!parsed) return FALLBACK_HIGHLIGHTS;
+    if (config.nodeEnv !== "production")
+      console.log(`[DialogueHighlights ${model}]`, JSON.stringify(parsed));
+    return parsed;
+  } catch (firstError) {
+    console.warn("DialogueHighlights first attempt failed, retrying:", firstError);
+    try {
+      const retry = await openai.beta.chat.completions.parse({
+        model,
+        messages: [
+          ...messages,
+          {
+            role: "user",
+            content:
+              "Your previous response was invalid. Return valid JSON matching the required schema with topic, subtopics, whatWentWell, focusArea, and encouragement fields.",
+          },
+        ],
+        response_format: zodResponseFormat(DailyPracticeHighlightsSchema, "daily_practice_highlights"),
+        max_tokens: 400,
+      });
+      return retry.choices[0]?.message?.parsed ?? FALLBACK_HIGHLIGHTS;
+    } catch (retryError) {
+      console.error("DialogueHighlights failed after retry:", retryError);
+      return FALLBACK_HIGHLIGHTS;
+    }
+  }
+}
 
 export async function callDailyPracticeFinale(
   history: LLMMessage[],

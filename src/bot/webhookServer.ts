@@ -207,7 +207,7 @@ async function handleProgressRequest(
         challengeCompletedCount: 0,
         currentDayNumber: 1,
         weeklyActiveDates: [] as string[],
-        today: { status: "none", dayNumber: 1, dayLabel: "Знакомство" },
+        today: { status: "none", dayNumber: 1, dayLabel: "Знакомство", sentenceCount: 0 },
       };
       res.writeHead(200, jsonHeaders);
       res.end(JSON.stringify(zeroed));

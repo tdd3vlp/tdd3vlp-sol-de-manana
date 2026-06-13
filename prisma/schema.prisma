@@ -20,12 +20,15 @@ model Chat {
   dailyResetAt            DateTime          @default(now())
   customerEmail           String?
   pendingPaymentPlan      String?
-  streakCount             Int               @default(0)
-  lastStreakDate          String?
-  weeklyActiveDates       String            @default("[]")
-  weeklyResetAt           DateTime?
-  challengeCompletedCount Int               @default(0)
-  createdAt               DateTime          @default(now())
+  streakCount                  Int               @default(0)
+  lastStreakDate               String?
+  weeklyActiveDates            String            @default("[]")
+  weeklyResetAt                DateTime?
+  challengeCompletedCount      Int               @default(0)
+  dailyPracticeSentenceCount   Int               @default(0)
+  dailyPracticeCompletedAt     DateTime?
+  dailyPracticeResetAt         DateTime?
+  createdAt                    DateTime          @default(now())
   updatedAt               DateTime          @updatedAt
   messages                Message[]
   practiceSessions        PracticeSession[]
