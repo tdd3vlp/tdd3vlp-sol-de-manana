@@ -15,7 +15,7 @@ export const DailyPracticeHighlightsSchema = z.object({
     .describe("2-4 sentences in Russian summarising everything discussed in the conversation. Cover all topics equally — do not pick one as the main topic."),
   mistakes: z.array(z.string())
     .describe("Corrections from the conversation, each formatted as 'написал X → правильно Y'. Extract ONLY from explicit 'Corrección:' lines in the assistant messages. Do NOT invent mistakes. Do NOT treat 'En español:' translation lines as mistakes. Empty array [] if no Corrección lines exist."),
-  usefulPhrases: z.array(z.string())
+  usefulPhrases: z.array(z.string()).min(4).max(7)
     .describe("4-7 useful Spanish phrases related to the topics discussed. Each on one line with brief Russian gloss: 'ir al mercado — сходить на рынок'. ALWAYS fill this, even if mistakes is non-empty."),
   whatWentWell: z.string()
     .describe("What the user did well — 1 sentence in Russian"),

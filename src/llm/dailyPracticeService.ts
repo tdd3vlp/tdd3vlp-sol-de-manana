@@ -122,7 +122,12 @@ export async function callDailyPractice(
 const FALLBACK_HIGHLIGHTS: DailyPracticeHighlights = {
   summary: "Сегодня прошла хорошая практика испанского языка.",
   mistakes: [],
-  usefulPhrases: ["hablar con alguien — поговорить с кем-то", "¿Qué te parece? — Как тебе кажется?"],
+  usefulPhrases: [
+    "hablar con alguien — поговорить с кем-то",
+    "¿Qué te parece? — Как тебе кажется?",
+    "me gustaría... — мне бы хотелось...",
+    "¿Puedes repetir? — Можешь повторить?",
+  ],
   whatWentWell: "Ты старался и продолжал разговор.",
   focusArea: "Продолжай практиковать акцентные знаки.",
   languageNote: "Глагол estar используется для временных состояний, а ser — для постоянных характеристик.",
@@ -147,7 +152,7 @@ export async function callDialogueHighlights(
       model,
       messages,
       response_format: zodResponseFormat(DailyPracticeHighlightsSchema, "daily_practice_highlights"),
-      max_tokens: 600,
+      max_tokens: 1000,
     });
     const parsed = completion.choices[0]?.message?.parsed;
     if (!parsed) return FALLBACK_HIGHLIGHTS;
@@ -168,7 +173,7 @@ export async function callDialogueHighlights(
           },
         ],
         response_format: zodResponseFormat(DailyPracticeHighlightsSchema, "daily_practice_highlights"),
-        max_tokens: 600,
+        max_tokens: 1000,
       });
       return retry.choices[0]?.message?.parsed ?? FALLBACK_HIGHLIGHTS;
     } catch (retryError) {
@@ -198,7 +203,7 @@ export async function callDailyPracticeFinale(
       model,
       messages,
       response_format: zodResponseFormat(DailyPracticeHighlightsSchema, "daily_practice_highlights"),
-      max_tokens: 600,
+      max_tokens: 1000,
     });
     const parsed = completion.choices[0]?.message?.parsed;
     if (!parsed) return FALLBACK_HIGHLIGHTS;
@@ -219,7 +224,7 @@ export async function callDailyPracticeFinale(
           },
         ],
         response_format: zodResponseFormat(DailyPracticeHighlightsSchema, "daily_practice_highlights"),
-        max_tokens: 600,
+        max_tokens: 1000,
       });
       return retry.choices[0]?.message?.parsed ?? FALLBACK_HIGHLIGHTS;
     } catch (retryError) {

@@ -1098,18 +1098,6 @@
               </div>`;
             }
           }
-          if (h.whatWentWell) {
-            html += `<div class="highlights-section">
-              <div class="highlights-section-title">Хорошо получилось</div>
-              <div class="highlights-text">${escapeHtml(h.whatWentWell)}</div>
-            </div>`;
-          }
-          if (h.focusArea) {
-            html += `<div class="highlights-section">
-              <div class="highlights-section-title">Над чем поработать</div>
-              <div class="highlights-text">${escapeHtml(h.focusArea)}</div>
-            </div>`;
-          }
           if (h.mistakes && h.mistakes.length > 0) {
             html += `<div class="highlights-section">
               <div class="highlights-section-title">Ошибки</div>
@@ -1120,6 +1108,18 @@
             html += `<div class="highlights-section">
               <div class="highlights-section-title">Полезные фразы</div>
               <ul class="highlights-list">${h.usefulPhrases.map(p => `<li>${escapeHtml(p)}</li>`).join("")}</ul>
+            </div>`;
+          }
+          if (h.whatWentWell) {
+            html += `<div class="highlights-section">
+              <div class="highlights-section-title">Хорошо получилось</div>
+              <div class="highlights-text">${escapeHtml(h.whatWentWell)}</div>
+            </div>`;
+          }
+          if (h.focusArea) {
+            html += `<div class="highlights-section">
+              <div class="highlights-section-title">Над чем поработать</div>
+              <div class="highlights-text">${escapeHtml(h.focusArea)}</div>
             </div>`;
           }
           if (h.languageNote) {

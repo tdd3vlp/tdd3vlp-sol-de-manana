@@ -81,6 +81,13 @@ const BTN_TOPIC_MENU = "Выбор темы";
 const BTN_MODE_TRANSLATION = "Режим перевода";
 const BTN_MODE_DIALOGUE = "Режим диалога";
 const BTN_CUSTOM_TOPIC = "Своя тема";
+export function getHighlightsModel(plan: string, telegramUserId?: string): string {
+  const isPremium =
+    getEffectivePlan({ plan, planExpiresAt: null }) === "premium" ||
+    (telegramUserId != null && isAdminUser(telegramUserId));
+  return isPremium ? config.openaiModelPremiumHighlights : config.openaiModelHighlights;
+}
+
 export function buildDialogueKeyboard(plan: string, userId?: string): Keyboard {
   const kb = new Keyboard().text(BTN_TOPIC_MENU);
   if (plan === "premium" || (userId && isAdminUser(userId))) {
@@ -1165,12 +1172,7 @@ async function trackDailyPracticeProgress(
           { role: "user" as const, content: userText },
           { role: "assistant" as const, content: rawSolResponse },
         ];
-        const isPremiumForHighlights =
-          getEffectivePlan(chat) === "premium" ||
-          (telegramUserId != null && isAdminUser(telegramUserId));
-        const highlightsModel = isPremiumForHighlights
-          ? config.openaiModelPremiumHighlights
-          : config.openaiModelHighlights;
+        const highlightsModel = getHighlightsModel(chat.plan, telegramUserId);
         const highlights = await callDialogueHighlights(
           historyWithCurrentTurn,
           chat.currentTheme,

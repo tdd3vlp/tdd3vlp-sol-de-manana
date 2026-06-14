@@ -404,7 +404,12 @@ describe("getProgressState", () => {
     const highlights = {
       summary: "Сегодня говорили о том, как спрашивать дорогу в городе.",
       mistakes: ["написал al playa → правильно a la playa"],
-      usefulPhrases: ["¿Dónde está...? — Где находится...?"],
+      usefulPhrases: [
+        "¿Dónde está...? — Где находится...?",
+        "todo recto — прямо",
+        "a la derecha — направо",
+        "a la izquierda — налево",
+      ],
       whatWentWell: "Хорошо использовал предлоги",
       focusArea: "Поработать над произношением",
       languageNote: "Слово 'playa' — женского рода: la playa.",

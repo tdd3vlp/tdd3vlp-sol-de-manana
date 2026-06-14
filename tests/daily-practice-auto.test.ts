@@ -34,6 +34,7 @@ import {
   incrementDailySentenceCount,
   markDailyPracticeCompleted,
 } from "../src/db/practiceSession.js";
+import { getHighlightsModel } from "../src/bot/handlers.js";
 import { makeChat } from "../src/testing/fixtures.js";
 
 beforeEach(() => {
@@ -121,5 +122,29 @@ describe("markDailyPracticeCompleted", () => {
       where: { id: "chat-1", dailyPracticeCompletedAt: null },
       data: { dailyPracticeCompletedAt: expect.any(Date) },
     });
+  });
+});
+
+// ─── getHighlightsModel ────────────────────────────────────────────────────────
+
+describe("getHighlightsModel", () => {
+  it("returns openaiModelHighlights for free plan", () => {
+    expect(getHighlightsModel("free")).toBe("gpt-4o-mini");
+  });
+
+  it("returns openaiModelHighlights for basic plan", () => {
+    expect(getHighlightsModel("basic")).toBe("gpt-4o-mini");
+  });
+
+  it("returns openaiModelPremiumHighlights for premium plan", () => {
+    expect(getHighlightsModel("premium")).toBe("gpt-4o");
+  });
+
+  it("returns openaiModelPremiumHighlights for admin user regardless of plan", () => {
+    expect(getHighlightsModel("free", "admin-1")).toBe("gpt-4o");
+  });
+
+  it("returns openaiModelHighlights for non-admin beta user", () => {
+    expect(getHighlightsModel("free", "beta-1")).toBe("gpt-4o-mini");
   });
 });
